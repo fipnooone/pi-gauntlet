@@ -105,7 +105,7 @@ When agents return:
 
 **If integrated changes apply cleanly but the suite fails (semantic conflict):** agents made incompatible assumptions across disjoint files (renamed symbol, changed shape). Diagnose the incompatible pair and re-run the offending task sequentially on the integrated HEAD.
 
-**If some agents failed:** Integrate successful agents first (commit their work). Then retry the failed agent with fresh context that includes the integrated changes.
+**If some agents failed:** Integrate successful agents first (commit their work). Then retry the failed agent with fresh context that includes the integrated changes. Inside the conformance loop the retry is a one-task `tasks` wave, never a lone `agent: "implementer"`.
 
 ## Fix fan-out
 

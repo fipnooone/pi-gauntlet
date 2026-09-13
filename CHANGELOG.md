@@ -3,6 +3,9 @@
 ## Unreleased
 
 - `code-reviewer`: verdict is a stated function of severity - a Critical or Moderate finding means `FIX_FIRST`, Minor-only and clean reports mean `SHIP`, matching the orchestrating skills. (#30)
+- `phase-tracker`: two new closure-review blocks inside a brainstorming-entered flow once `verify` is in progress and a conformance audit has been observed - a lone top-level `agent: "implementer"` `subagent` dispatch is blocked (one-task `tasks` wave is the only isolated shape), and an implementer dispatch past `closureReview.maxFixRounds` is blocked with the escalation text. Rounds are counted from non-error results carrying an implementer child; the counter resets with the audit latch. `closureReview.enforce: false` disables both.
+- `closureReview.maxFixRounds` default 2 -> 3.
+- `conformance-check.md` / `dispatching-parallel-agents`: retries inside the conformance loop are one-task `tasks` waves and count against the cap.
 
 ## v5.5.2 - 2026-09-13
 

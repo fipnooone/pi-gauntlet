@@ -6,9 +6,14 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import registerPhaseTracker from "./phase-tracker.ts";
 
+const originalSubagentDepth = process.env.PI_SUBAGENT_DEPTH;
+process.env.PI_SUBAGENT_DEPTH = "0";
+
 const tempDirs: string[] = [];
 after(() => {
   for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+  if (originalSubagentDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
+  else process.env.PI_SUBAGENT_DEPTH = originalSubagentDepth;
 });
 
 const tempCwd = (settings?: unknown) => {
@@ -529,7 +534,8 @@ test("implement-phase commit with implementer newer than both reviewers warns", 
     const warned = (await h.emitEvent("tool_result", commitResult("c1")))[0] as { content: { text: string }[] };
     assert.match(warned.content[0].text, /no spec-reviewer or code-reviewer observed/);
   } finally {
-    if (priorDepth !== undefined) process.env.PI_SUBAGENT_DEPTH = priorDepth;
+    if (priorDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
+    else process.env.PI_SUBAGENT_DEPTH = priorDepth;
   }
 });
 
@@ -1163,4 +1169,256 @@ test("gauntlet_setting escalationLoop: setting absent -> ctx-derived main-loop m
   const set = harness({ cwd: tempCwd({ piGauntlet: { escalationLoop: { implModel: "p/strong:high" } } }), model: { provider: "p", id: "main" }, thinkingLevel: "medium" });
   const res = (await set.tools.find((t) => t.name === "gauntlet_setting")!.execute("g2", { key: "escalationLoop" }, undefined, undefined, set.ctx)) as { details: { implModel?: string } };
   assert.equal(res.details.implModel, "p/strong:high");
+});
+
+// --- Conformance fix-loop dispatch guard (spec 2026-09-13-conformance-dispatch-guard) ---
+
+const verifyBranch = (extra: unknown[] = []) => [
+  ...implementBranch(),
+  phaseResult("complete", phases({ brainstorm: "complete", plan: "complete", implement: "complete" })),
+  phaseResult("start", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "in_progress" })),
+  ...extra,
+];
+
+const subagentCall = (id: string, input: unknown) => ({ toolName: "subagent", toolCallId: id, input });
+const loneImplementer = (extra: Record<string, unknown> = {}) => ({ agent: "implementer", task: "fix G1", ...extra });
+const implementerWave = (n = 1) => ({
+  tasks: Array.from({ length: n }, (_, i) => ({ agent: "implementer", task: `fix G${i + 1}`, worktree: true })),
+});
+
+const firstCallResult = async (h: ReturnType<typeof harness>, id: string, input: unknown) =>
+  (await h.emitEvent("tool_call", subagentCall(id, input)))[0] as { block?: boolean; reason?: string } | undefined;
+
+test("shape guard: lone implementer blocked in verify after the audit, with and without closureReview.model, async or not", async () => {
+  for (const settings of [
+    { piGauntlet: { closureReview: { enforce: true } } },
+    { piGauntlet: { closureReview: { enforce: true, model: "x/y" } } },
+  ]) {
+    const h = harness({ cwd: tempCwd(settings), branch: verifyBranch([subagentResult(["conformance-reviewer"])]) });
+    await h.emit("session_start");
+    const sync = await firstCallResult(h, "s1", loneImplementer());
+    assert.equal(sync?.block, true);
+    assert.match(sync?.reason ?? "", /dispatch implementers as a one-task tasks wave/);
+    assert.match(sync?.reason ?? "", /piGauntlet\.closureReview\.enforce: false/);
+    const async = await firstCallResult(h, "s2", loneImplementer({ async: true }));
+    assert.equal(async?.block, true);
+  }
+});
+
+test("shape guard: lone implementer passes before the audit, in implement, in ship, and on management calls", async () => {
+  const preLatch = harness({ branch: verifyBranch() });
+  await preLatch.emit("session_start");
+  assert.equal(await firstCallResult(preLatch, "s1", loneImplementer()), undefined);
+
+  const implement = harness({ branch: implementBranch([subagentResult(["conformance-reviewer"])]) });
+  await implement.emit("session_start");
+  assert.equal(await firstCallResult(implement, "s1", loneImplementer()), undefined);
+
+  const ship = harness({
+    branch: verifyBranch([
+      subagentResult(["conformance-reviewer"]),
+      phaseResult("complete", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "complete" })),
+      phaseResult("start", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "complete", ship: "in_progress" })),
+    ]),
+  });
+  await ship.emit("session_start");
+  assert.equal(await firstCallResult(ship, "s1", loneImplementer()), undefined);
+
+  const mgmt = harness({ branch: verifyBranch([subagentResult(["conformance-reviewer"])]) });
+  await mgmt.emit("session_start");
+  assert.equal(await firstCallResult(mgmt, "s1", { action: "status", agent: "implementer" }), undefined);
+});
+
+test("shape guard: dormant when the flow was never entered (cold start verify) and when closureReview.enforce is false", async () => {
+  const cold = harness({
+    cwd: tempCwd({ piGauntlet: { closureReview: { maxFixRounds: 0 } } }),
+    branch: [phaseResult("start", phases({ verify: "in_progress" })), subagentResult(["conformance-reviewer"])],
+  });
+  await cold.emit("session_start");
+  assert.equal(await firstCallResult(cold, "s1", loneImplementer()), undefined);
+  assert.equal(await firstCallResult(cold, "s2", implementerWave(1)), undefined);
+  assert.equal(await firstCallResult(cold, "s3", { chain: [{ agent: "implementer", task: "fix" }] }), undefined);
+
+  const off = harness({
+    cwd: tempCwd({ piGauntlet: { closureReview: { enforce: false } } }),
+    branch: verifyBranch([subagentResult(["conformance-reviewer"])]),
+  });
+  await off.emit("session_start");
+  assert.equal(await firstCallResult(off, "s1", loneImplementer()), undefined);
+});
+
+test("shape guard: a one-task tasks wave and a chain step are not the lone shape", async () => {
+  const h = harness({ branch: verifyBranch([subagentResult(["conformance-reviewer"])]) });
+  await h.emit("session_start");
+  assert.equal(await firstCallResult(h, "s1", implementerWave(1)), undefined);
+  assert.equal(await firstCallResult(h, "s2", { chain: [{ agent: "implementer", task: "fix" }] }), undefined);
+});
+
+const waveResult = (id: string, results: { agent: string; exitCode: number }[], isError = false) => ({
+  toolName: "subagent",
+  toolCallId: id,
+  isError,
+  content: [],
+  details: { results },
+});
+const okWave = (id: string) => waveResult(id, [{ agent: "implementer", exitCode: 0 }]);
+
+const guardedHarness = (settings: unknown, extra: unknown[] = []) =>
+  harness({ cwd: tempCwd(settings), branch: verifyBranch([subagentResult(["conformance-reviewer"]), ...extra]) });
+
+test("cap guard: default 3 waves pass, the fourth is blocked with the escalation text", async () => {
+  const h = guardedHarness({ piGauntlet: { closureReview: { enforce: true } } });
+  await h.emit("session_start");
+  for (let i = 1; i <= 3; i++) {
+    assert.equal(await firstCallResult(h, `c${i}`, implementerWave(2)), undefined, `round ${i} passes`);
+    await h.emitEvent("tool_result", okWave(`c${i}`));
+  }
+  const blocked = await firstCallResult(h, "c4", implementerWave(1));
+  assert.equal(blocked?.block, true);
+  assert.match(blocked?.reason ?? "", /fix round 3 of 3 already used; escalate to the human/);
+});
+
+test("cap guard: maxFixRounds 0 blocks the first wave; 1 blocks the second; a chain implementer is cap-checked and counted", async () => {
+  const zero = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } });
+  await zero.emit("session_start");
+  assert.equal((await firstCallResult(zero, "c1", implementerWave(1)))?.block, true);
+
+  const one = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 1 } } });
+  await one.emit("session_start");
+  assert.equal(await firstCallResult(one, "c1", { chain: [{ agent: "implementer", task: "fix" }] }), undefined);
+  await one.emitEvent("tool_result", okWave("c1"));
+  assert.equal((await firstCallResult(one, "c2", implementerWave(1)))?.block, true);
+});
+
+test("counter: results while closure review enforcement is off do not consume budget", async () => {
+  const h = guardedHarness({ piGauntlet: { closureReview: { enforce: false, maxFixRounds: 1 } } });
+  await h.emit("session_start");
+  await h.emitEvent("tool_result", okWave("c1"));
+  await h.emitEvent("tool_result", okWave("c2"));
+  writeFileSync(
+    join(h.ctx.cwd, ".pi", "settings.json"),
+    JSON.stringify({ piGauntlet: { closureReview: { enforce: true, maxFixRounds: 1 } } }),
+  );
+  assert.equal(await firstCallResult(h, "c3", implementerWave(1)), undefined);
+});
+
+test("fix-loop guard and counter are dormant in subagent children", async () => {
+  const priorDepth = process.env.PI_SUBAGENT_DEPTH;
+  process.env.PI_SUBAGENT_DEPTH = "1";
+  let live: ReturnType<typeof harness>;
+  let replay: ReturnType<typeof harness>;
+  try {
+    live = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } });
+    replay = guardedHarness(
+      { piGauntlet: { closureReview: { maxFixRounds: 2 } } },
+      [subagentResult(["implementer"]), subagentResult(["implementer"])],
+    );
+  } finally {
+    if (priorDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
+    else process.env.PI_SUBAGENT_DEPTH = priorDepth;
+  }
+
+  await live.emit("session_start");
+  assert.equal(await firstCallResult(live, "c1", loneImplementer()), undefined);
+  assert.equal(await firstCallResult(live, "c2", implementerWave(1)), undefined);
+  await live.emitEvent("tool_result", okWave("c2"));
+  await replay.emit("session_start");
+  assert.equal(await firstCallResult(replay, "c3", implementerWave(1)), undefined);
+});
+
+test("cap guard: non-implementer dispatches never blocked; enforce false passes everything", async () => {
+  const h = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } });
+  await h.emit("session_start");
+  assert.equal(await firstCallResult(h, "r1", { agent: "conformance-reviewer", task: "re-audit" }), undefined);
+  assert.equal(await firstCallResult(h, "r2", { agent: "code-reviewer", task: "review" }), undefined);
+
+  const off = guardedHarness({ piGauntlet: { closureReview: { enforce: false, maxFixRounds: 0 } } });
+  await off.emit("session_start");
+  assert.equal(await firstCallResult(off, "c1", implementerWave(1)), undefined);
+  assert.equal(await firstCallResult(off, "c2", loneImplementer()), undefined);
+});
+
+test("counter: blocked, errored, empty, non-implementer, and out-of-window results do not count; non-zero exit does", async () => {
+  const h = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 1 } } });
+  await h.emit("session_start");
+  await h.emitEvent("tool_result", waveResult("e1", [{ agent: "implementer", exitCode: 0 }], true));
+  await h.emitEvent("tool_result", waveResult("e2", []));
+  await h.emitEvent("tool_result", waveResult("e3", [{ agent: "code-reviewer", exitCode: 0 }]));
+  const blockedLone = await firstCallResult(h, "b1", loneImplementer());
+  assert.equal(blockedLone?.block, true);
+  assert.equal(await firstCallResult(h, "c1", implementerWave(1)), undefined, "budget untouched");
+  await h.emitEvent("tool_result", waveResult("c1", [{ agent: "implementer", exitCode: 1 }]));
+  assert.equal((await firstCallResult(h, "c2", implementerWave(1)))?.block, true);
+});
+
+test("counter: a ship-phase implementer wave with the latch set does not count", async () => {
+  const h = harness({
+    cwd: tempCwd({ piGauntlet: { closureReview: { maxFixRounds: 1 } } }),
+    branch: verifyBranch([
+      subagentResult(["conformance-reviewer"]),
+      phaseResult("complete", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "complete" })),
+      phaseResult("start", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "complete", ship: "in_progress" })),
+      subagentResult(["implementer"]),
+      phaseResult("start", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "in_progress", ship: "in_progress" })),
+    ]),
+  });
+  await h.emit("session_start");
+  assert.equal(await firstCallResult(h, "c1", implementerWave(1)), undefined);
+});
+
+test("counter reset: start implement and reset zero it; start verify --force keeps it", async () => {
+  const mk = () => guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 1 }, flowGuards: { enforce: false } } }, [subagentResult(["implementer"])]);
+
+  const force = mk();
+  await force.emit("session_start");
+  const forceTool = force.tools.find((t) => t.name === "phase_tracker")!;
+  const forced = (await forceTool.execute("p1", { action: "start", phase: "verify", force: true }, undefined, undefined, force.ctx)) as { details: { error?: string } };
+  assert.equal(forced.details.error, undefined);
+  assert.equal((await firstCallResult(force, "c1", implementerWave(1)))?.block, true, "budget survives verify --force");
+
+  const impl = mk();
+  await impl.emit("session_start");
+  const implTool = impl.tools.find((t) => t.name === "phase_tracker")!;
+  for (const [id, input] of [
+    ["p1", { action: "skip", phase: "verify", reason: "amendment" }],
+    ["p2", { action: "start", phase: "implement", force: true }],
+    ["p3", { action: "complete", phase: "implement" }],
+    ["p4", { action: "start", phase: "verify", force: true }],
+  ] as const) {
+    const result = (await implTool.execute(id, input, undefined, undefined, impl.ctx)) as { details: { error?: string } };
+    assert.equal(result.details.error, undefined);
+  }
+  assert.equal(await firstCallResult(impl, "c1", loneImplementer()), undefined, "latch cleared by start implement");
+  await impl.emitEvent("tool_result", waveResult("audit", [{ agent: "conformance-reviewer", exitCode: 0 }]));
+  assert.equal(await firstCallResult(impl, "c2", implementerWave(1)), undefined, "counter cleared by start implement");
+
+  const reset = mk();
+  await reset.emit("session_start");
+  const resetTool = reset.tools.find((t) => t.name === "phase_tracker")!;
+  const resetResult = (await resetTool.execute("p1", { action: "reset" }, undefined, undefined, reset.ctx)) as { details: { error?: string } };
+  assert.equal(resetResult.details.error, undefined);
+  assert.equal(await firstCallResult(reset, "c1", loneImplementer()), undefined, "dormant after reset");
+});
+
+test("replay: two implementer waves after the audit in verify restore fixRounds 2; the same waves in ship restore 0", async () => {
+  const inVerify = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 2 } } }, [
+    subagentResult(["implementer"]),
+    subagentResult(["implementer", "code-reviewer"]),
+  ]);
+  await inVerify.emit("session_start");
+  assert.equal((await firstCallResult(inVerify, "c1", implementerWave(1)))?.block, true);
+
+  const inShip = harness({
+    cwd: tempCwd({ piGauntlet: { closureReview: { maxFixRounds: 2 } } }),
+    branch: verifyBranch([
+      subagentResult(["conformance-reviewer"]),
+      phaseResult("complete", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "complete" })),
+      phaseResult("start", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "complete", ship: "in_progress" })),
+      subagentResult(["implementer"]),
+      subagentResult(["implementer"]),
+      phaseResult("start", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "in_progress", ship: "in_progress" })),
+    ]),
+  });
+  await inShip.emit("session_start");
+  assert.equal(await firstCallResult(inShip, "c1", implementerWave(1)), undefined);
 });

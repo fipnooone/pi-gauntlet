@@ -86,6 +86,17 @@ const qualifiesAsClosureDispatch = (details: unknown): boolean => {
   return d.results.some((r) => r?.agent === "conformance-reviewer" && r?.exitCode === 0);
 };
 
+// One conformance fix round = one non-error subagent result carrying at least one
+// implementer child, regardless of dispatch mode or per-child exit code (a failed
+// implementer still spent the round; its retry is the next one). Async and
+// management dispatches return results: [] and never count.
+const isImplementerWave = (details: unknown, isError: boolean | undefined): boolean => {
+  if (isError === true) return false;
+  const d = details as { results?: { agent?: unknown }[] } | undefined;
+  if (!d || !Array.isArray(d.results) || d.results.length === 0) return false;
+  return d.results.some((r) => r?.agent === "implementer");
+};
+
 // Review-cadence guard (spec 2026-08-12-execution-fidelity-hardening): presence-only
 // advisory ledger of the most recent completed implementer / spec-reviewer /
 // code-reviewer dispatch. Agents completing in the SAME dispatch share a sequence
@@ -164,22 +175,14 @@ const branchBlockReason = (phase: Phase): string =>
   "create/enter one with /skill:using-git-worktrees and run this there. " +
   "To override, set piGauntlet.flowGuards.enforce: false.";
 
-// Closure-review model guard: when piGauntlet.closureReview.model is configured,
-// a conformance-reviewer dispatch should inject that model call-site. The persona
-// ships model-free, so a bare omission silently inherits the parent session's
-// builder model - defeating the point of an independent closing gate. Walk the
-// single / tasks / chain / parallel dispatch shapes and collect the model of every
-// conformance-reviewer entry (undefined = absent/empty/non-string). A bare omission
-// is BLOCKED; an explicit model that differs from the configured one is WARNED
-// (non-blocking), preserving the documented retry-with-fallback hatch while
-// surfacing drift.
-const conformanceModels = (input: unknown): (string | undefined)[] => {
-  const models: (string | undefined)[] = [];
-  const norm = (m: unknown) => (typeof m === "string" && m.trim() ? m.trim() : undefined);
+// Walk the single / tasks / chain / parallel dispatch shapes and return every
+// entry whose `agent` matches `name` (the raw node, so callers can read its model).
+const collectAgents = (input: unknown, name: string): Record<string, unknown>[] => {
+  const hits: Record<string, unknown>[] = [];
   const collect = (node: unknown): void => {
     if (!node || typeof node !== "object") return;
     const o = node as Record<string, unknown>;
-    if (o.agent === "conformance-reviewer") models.push(norm(o.model));
+    if (o.agent === name) hits.push(o);
     for (const key of ["tasks", "chain", "parallel"] as const) {
       const v = o[key];
       if (Array.isArray(v)) for (const item of v) collect(item);
@@ -187,8 +190,26 @@ const conformanceModels = (input: unknown): (string | undefined)[] => {
     }
   };
   collect(input);
-  return models;
+  return hits;
 };
+
+const conformanceModels = (input: unknown): (string | undefined)[] =>
+  collectAgents(input, "conformance-reviewer").map((o) =>
+    typeof o.model === "string" && o.model.trim() ? o.model.trim() : undefined,
+  );
+
+// Conformance fix-loop dispatch guard (spec 2026-09-13-conformance-dispatch-guard):
+// after the first audit, pi-cohort honours worktree: true only in tasks mode, so a
+// lone implementer runs unisolated and yields no patch for the integrate step.
+const loneImplementerBlockReason =
+  'Conformance fix loop: dispatch implementers as a one-task tasks wave (tasks: [{ agent: "implementer", worktree: true, ... }]); ' +
+  "a lone agent call runs unisolated and produces no worktree diff. " +
+  "To disable this gate, set piGauntlet.closureReview.enforce: false.";
+
+const fixRoundCapBlockReason = (used: number, cap: number): string =>
+  `Conformance fix loop: fix round ${used} of ${cap} already used; escalate to the human ` +
+  "with the verdict trail instead of re-looping. " +
+  "To disable this gate, set piGauntlet.closureReview.enforce: false.";
 
 const closureModelBlockReason = (model: string, missing: number, total: number): string =>
   `Blocked: ${missing} of ${total} conformance-reviewer ${total === 1 ? "dispatch" : "entries"} ` +
@@ -306,7 +327,23 @@ function formatStatus(phases: PhaseMap): string {
 export default function (pi: ExtensionAPI) {
   let phases: PhaseMap = emptyPhases();
   let conformanceDispatched = false;
+  let fixRounds = 0;
   let gauntletEntered = false;
+  // Shared by replay and the live tool_result hook so a resumed session enforces
+  // the same budget. Evaluated BEFORE the same result may set the latch, so the
+  // R0 audit result itself never counts as a wave.
+  const observeFixWave = (details: unknown, isError: boolean | undefined, ctx: ExtensionContext) => {
+    if (
+      !isSubagentChild &&
+      gauntletEntered &&
+      phases.verify.status === "in_progress" &&
+      conformanceDispatched &&
+      isImplementerWave(details, isError) &&
+      resolveClosureReview(loadGauntletSettings(ctx.cwd).gauntlet).enforce
+    ) {
+      fixRounds += 1;
+    }
+  };
   let planCheckStamp: PlanCheckStamp | undefined;
   const attemptedRecoveryEdges = new Set<RecoveryEdge>();
 
@@ -382,6 +419,7 @@ export default function (pi: ExtensionAPI) {
   const reconstructState = (ctx: ExtensionContext) => {
     phases = emptyPhases();
     conformanceDispatched = false;
+    fixRounds = 0;
     gauntletEntered = false;
     planCheckStamp = undefined;
     attemptedRecoveryEdges.clear();
@@ -409,9 +447,11 @@ export default function (pi: ExtensionAPI) {
           gauntletEntered = nextGauntletEntered(gauntletEntered, details.action, details.phases.brainstorm.status);
           if (details.action === "start" && details.phases.implement.status === "in_progress") {
             conformanceDispatched = false;
+            fixRounds = 0;
           }
           if (details.action === "reset") {
             conformanceDispatched = false;
+            fixRounds = 0;
             planCheckStamp = undefined;
           }
         }
@@ -423,6 +463,7 @@ export default function (pi: ExtensionAPI) {
           planCheckStamp = undefined;
         }
       } else if (msg.toolName === "subagent") {
+        observeFixWave(msg.details, msg.isError, ctx);
         if (qualifiesAsClosureDispatch(msg.details)) conformanceDispatched = true;
         observeCadence(msg.details);
       } else if (msg.toolName === "plan_tracker") {
@@ -492,10 +533,20 @@ export default function (pi: ExtensionAPI) {
     // subagent dispatch never loads settings or leaks a settingsErrorWarning onto its result.
     // Inline-matched (not called) so closureEnforced() stays a lazy second conjunct.
     if (event.toolName === "subagent" && gauntletEntered && closureEnforced()) {
-      const model = closureReviewModel();
-      // Only execution-mode dispatches carry a model; management/control modes
-      // (action: list/get/create/update/delete/status/...) execute nothing, so skip them.
+      // Only execution-mode dispatches carry a model or run agents; management/control
+      // modes (action: list/get/create/update/delete/status/...) execute nothing, so skip them.
       const hasAction = !!(event.input as { action?: unknown })?.action;
+      // Fix-loop window: verify in progress and the R0 audit observed. Read directly,
+      // not via activeGuardPhase() - verify is not a GUARD_PHASES member.
+      const fixLoopWindow = !isSubagentChild && !hasAction && phases.verify.status === "in_progress" && conformanceDispatched;
+      if (fixLoopWindow && (event.input as { agent?: unknown })?.agent === "implementer") {
+        return { block: true, reason: loneImplementerBlockReason };
+      }
+      if (fixLoopWindow && collectAgents(event.input, "implementer").length > 0) {
+        const cap = resolveClosureReview(g()).maxFixRounds;
+        if (fixRounds >= cap) return { block: true, reason: fixRoundCapBlockReason(fixRounds, cap) };
+      }
+      const model = closureReviewModel();
       if (model && !hasAction) {
         const configured = model.trim();
         const models = conformanceModels(event.input);
@@ -635,8 +686,9 @@ export default function (pi: ExtensionAPI) {
     return undefined;
   });
 
-  pi.on("tool_result", async (event) => {
+  pi.on("tool_result", async (event, ctx) => {
     if (event.toolName === "subagent") {
+      observeFixWave(event.details, event.isError, ctx);
       if (qualifiesAsClosureDispatch(event.details)) conformanceDispatched = true;
       observeCadence(event.details);
       const warning = pendingGuardWarnings.get(event.toolCallId);
@@ -859,7 +911,10 @@ export default function (pi: ExtensionAPI) {
           }
           phases = { ...phases, [params.phase]: transitionPhaseState("in_progress") as PhaseState };
           // A rewind must not inherit the prior verify's conformance latch.
-          if (params.phase === "implement") conformanceDispatched = false;
+          if (params.phase === "implement") {
+            conformanceDispatched = false;
+            fixRounds = 0;
+          }
           gauntletEntered = nextGauntletEntered(gauntletEntered, "start", phases.brainstorm.status);
           firedGuards.clear();
           updateWidget(ctx);
@@ -1024,6 +1079,7 @@ export default function (pi: ExtensionAPI) {
             PHASES.map((p) => [p, transitionPhaseState("pending")]),
           ) as PhaseMap;
           conformanceDispatched = false;
+          fixRounds = 0;
           gauntletEntered = nextGauntletEntered(gauntletEntered, "reset", phases.brainstorm.status);
           firedGuards.clear();
           updateWidget(ctx);

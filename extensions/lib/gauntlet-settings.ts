@@ -84,7 +84,7 @@ export function resolveClosureReview(g: PiGauntlet): ClosureReviewResolved {
   const model = nonEmptyString(cr?.model) ? cr!.model.trim() : undefined;
   const enforce = cr?.enforce !== false;
   const raw = cr?.maxFixRounds;
-  const maxFixRounds = typeof raw === "number" && Number.isInteger(raw) ? (raw < 0 ? 0 : raw) : 2;
+  const maxFixRounds = typeof raw === "number" && Number.isInteger(raw) ? (raw < 0 ? 0 : raw) : 3;
   return { model, enforce, maxFixRounds };
 }
 

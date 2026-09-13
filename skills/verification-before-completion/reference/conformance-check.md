@@ -157,7 +157,9 @@ Per round:
    context; semantic conflict (applies clean, suite fails) → re-run the
    offending task sequentially on integrated HEAD; a failed agent → integrate
    the successes, then retry the failure with fresh context including the
-   integrated changes. A `BLOCKED`/`NEEDS_CONTEXT` return surfaces to the user.
+   integrated changes. Every re-run or retry inside this loop is itself a
+   one-task `tasks` wave (never a lone `agent: "implementer"`) and counts as a
+   wave against `maxFixRounds`. A `BLOCKED`/`NEEDS_CONTEXT` return surfaces to the user.
 4. **Scoped tests** on the integrated tree: the round's `SCOPED_TEST_COMMANDS` union. A failure re-enters the failure-handling rules above.
 5. **Re-audit**: foreground re-dispatch `conformance-reviewer` with `async: false` over the fixes **plus** the
    regression guard (any prior-`DELIVERED` requirement whose `evidence` file
@@ -173,10 +175,13 @@ Per round:
 6. **Converge or continue**: verdict `CONFORMS` → Convergence below. Open gaps
    within the cap → re-partition (per the rule above) and start the next
    round. Cap (`gauntlet_setting({ key: "closureReview" }).maxFixRounds`,
-   default `2`, floors negatives at `0`, coerces non-integers to `2`) reached
+   default `3`, floors negatives at `0`, coerces non-integers to `3`) reached
    with an open `fix` gap or repair item → **escalate to the human** with the per-gap
    round-by-round verdict trail. Escalation is the sole non-completing
-   terminal state — no silent re-loop, no auto-ship.
+   terminal state — no silent re-loop, no auto-ship. Inside a
+   brainstorming-entered flow the phase tracker enforces both rules at
+   tool-call time: a lone `agent: "implementer"` dispatch is blocked, and the
+   wave after the cap is blocked (`closureReview.enforce: false` disables).
 
 **Convergence** — runs after R0 `CONFORMS` and after every `CONFORMS` re-audit. `r0-head` is HEAD when the loop was entered (the R0 dispatch, or the finish-time `fix-now` entry) - the parent of the oldest `conformance fix` commit; `audited-base` stays the last audit's HEAD SHA.
 
