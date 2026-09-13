@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Production-readiness code review with prioritized findings (Critical blocks merge, Minor is a nit). Read-only — does not edit.
+description: Production-readiness code review with prioritized findings (Critical and Moderate block merge, Minor is a nit). Read-only — does not edit.
 tools: read, grep, find, ls, bash
 defaultContext: fresh
 inheritProjectContext: true
@@ -44,11 +44,15 @@ Parallel-safe: F1,F3 disjoint; F2 conflicts F1 (both touch auth.ts)
 Behaviour-change: yes | no
 ```
 
+Severity decides SHIP versus FIX_FIRST. A Critical or Moderate finding means
+FIX_FIRST. Minor-only findings and clean reports mean SHIP. REJECT overrides
+both: refuse a change that must not land at all.
+
 Severity:
 
 - **Critical** — must fix before merge (data loss, security, broken correctness on a common path, broken contract).
-- **Moderate** — should fix; open for discussion (significant but not strictly blocking).
-- **Minor** — nit, style, preference, suggestion.
+- **Moderate** — must fix before merge (significant defect or drift that does not rise to Critical).
+- **Minor** — nit, style, preference, suggestion; the only severity declinable without a fix round or re-review.
 
 Label every finding with a globally unique `F1..Fn` ID (no restart per severity),
 and a `touched-files:`/`touched-resources:` pair (files/resources a fix would

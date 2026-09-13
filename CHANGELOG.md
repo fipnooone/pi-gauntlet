@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `code-reviewer`: verdict is a stated function of severity - a Critical or Moderate finding means `FIX_FIRST`, Minor-only and clean reports mean `SHIP`, matching the orchestrating skills. (#30)
+
 ## v5.5.2 - 2026-09-13
 
 - `release.sh <level>` promotes the CHANGELOG `## Unreleased` section to `## vX.Y.Z - <date>` and commits it with `package.json` in the single `Release X.Y.Z` commit, so `patch`/`minor`/`major` now work here (the `current`-only path is gone). New CONFIG field `CHANGELOG_HEADING`.
