@@ -1,5 +1,7 @@
 # Conformance fix-loop dispatch guard
 
+> **Superseded by:** [doc/specs/2026-09-14-fix-round-human-overrule.md](./2026-09-14-fix-round-human-overrule.md) - cap-block escalation paths only (Decisions row "Switch", 3.2 table row 2 block text, section 4 final bullet on documented escapes)
+
 **Goal:** Enforce at runtime, in `extensions/phase-tracker.ts`, the two conformance-loop rules that `doc/specs/2026-09-13-lean-conformance-loop.md` currently states only in prose: after the first conformance audit, implementers are dispatched only as a `tasks` wave, and the number of waves is bounded by `piGauntlet.closureReview.maxFixRounds`. Default `maxFixRounds` moves from 2 to 3.
 
 Amends `doc/specs/2026-09-13-lean-conformance-loop.md` (adds enforcement; does not change the loop shape). Supersedes: none.

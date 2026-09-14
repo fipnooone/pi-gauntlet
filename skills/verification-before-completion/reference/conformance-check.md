@@ -126,8 +126,10 @@ partition from an earlier round.
 
 Mirrors `subagent-driven-development` Parallel-Wave Mode and reuses its
 `plan_tracker` progress surface. Runs entirely inside the gate — it invokes
-**no** `phase_tracker` calls (`phase_tracker({ phase: "implement" })` errors
-while verify is `in_progress`) and does **not** enter SDD's phase machinery.
+**no** phase-transition `phase_tracker` calls (`start`/`complete`/`skip`/`reset`
+- `phase_tracker({ phase: "implement" })` errors while verify is `in_progress`;
+the only `phase_tracker` call inside the loop is the human-approval
+`grant_fix_rounds` in step 6) and does **not** enter SDD's phase machinery.
 Only the fan-out/integrate/review shape and `plan_tracker` are reused. Every execution dispatch is foreground with top-level `async: false`, including retries and prose-described dispatches; an unexpected async handle is a configuration failure: stop and report, never poll or relaunch. `forceTopLevelAsync` is incompatible; see [pi-cohort dispatch configuration](https://github.com/jjuraszek/pi-cohort/blob/main/doc/configuration.md).
 
 **Precondition — worktree required.** The loop needs a worktree HEAD to branch
@@ -178,8 +180,11 @@ Per round:
    default `3`, floors negatives at `0`, coerces non-integers to `3`) reached
    with an open `fix` gap or repair item → **escalate to the human** with the per-gap
    round-by-round verdict trail. Escalation is the sole non-completing
-   terminal state — no silent re-loop, no auto-ship. Inside a
-   brainstorming-entered flow the phase tracker enforces both rules at
+   terminal state — no silent re-loop, no auto-ship. If the human explicitly
+   approves N more rounds, record `phase_tracker({ action: "grant_fix_rounds",
+   rounds: N, reason: "<their words>" })` and re-enter step 2; without that
+   approval, escalation stays terminal. Inside a brainstorming-entered flow
+   the phase tracker enforces both rules at
    tool-call time: a lone `agent: "implementer"` dispatch is blocked, and the
    wave after the cap is blocked (`closureReview.enforce: false` disables).
 
@@ -187,7 +192,7 @@ Per round:
 
 a. Run the full plan-header `Verification` set once (ad-hoc: the project's canonical test command). After R0 `CONFORMS` with no round run, the pre-R0 full run counts.
 b. Dispatch `code-reviewer` directly (foreground, `async: false`, `SCOPED_TEST_COMMANDS: none`) over `git diff <r0-head>..HEAD`; never via `/skill:requesting-code-review`. An empty diff is nothing to review - no dispatch.
-c. Repair items = every failing command from a + every Critical/Moderate finding from b (`Behaviour-change: yes` included; the re-audit is its origin check). None → write the closure block; done. Any at the cap → escalate per step 6 with the test/CR trail. Any under the cap → re-enter step 2 as a one-task `tasks` wave: one `implementer` whose task is every repair item verbatim (ownership boundary = the files in `git diff <r0-head>..HEAD`, the CR findings' `touched-files`, and the files each failing command's output names, `SCOPED_TEST_COMMANDS: none`, no `Gn` tracker task, no gap selection), integrate as one `conformance fix CR`, re-audit, then Convergence again. That wave counts against `maxFixRounds`. Later Convergence CRs keep the same `<r0-head>..HEAD` range.
+c. Repair items = every failing command from a + every Critical/Moderate finding from b (`Behaviour-change: yes` included; the re-audit is its origin check). None → write the closure block; done. Any at the cap → escalate per step 6 with the test/CR trail (an explicit human approval re-enters via `grant_fix_rounds`, as step 6 describes). Any under the cap → re-enter step 2 as a one-task `tasks` wave: one `implementer` whose task is every repair item verbatim (ownership boundary = the files in `git diff <r0-head>..HEAD`, the CR findings' `touched-files`, and the files each failing command's output names, `SCOPED_TEST_COMMANDS: none`, no `Gn` tracker task, no gap selection), integrate as one `conformance fix CR`, re-audit, then Convergence again. That wave counts against `maxFixRounds`. Later Convergence CRs keep the same `<r0-head>..HEAD` range.
 
 `conformance fix CR` is not a gap fix: it is absent from the `auto-applied fix commits` index and has no `revert conformance fix Gn` action at the finish gate.
 

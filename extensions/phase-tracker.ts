@@ -56,9 +56,11 @@ interface PhaseState {
 type PhaseMap = Record<Phase, PhaseState>;
 
 interface PhaseTrackerDetails {
-  action: "start" | "complete" | "skip" | "status" | "reset" | "substep";
+  action: "start" | "complete" | "skip" | "status" | "reset" | "substep" | "grant_fix_rounds";
   phases: PhaseMap;
   error?: string;
+  rounds?: number;
+  reason?: string;
 }
 
 interface PlanCheckStamp {
@@ -206,10 +208,14 @@ const loneImplementerBlockReason =
   "a lone agent call runs unisolated and produces no worktree diff. " +
   "To disable this gate, set piGauntlet.closureReview.enforce: false.";
 
-const fixRoundCapBlockReason = (used: number, cap: number): string =>
-  `Conformance fix loop: fix round ${used} of ${cap} already used; escalate to the human ` +
-  "with the verdict trail instead of re-looping. " +
-  "To disable this gate, set piGauntlet.closureReview.enforce: false.";
+const fixRoundCapBlockReason = (used: number, cap: number, settingsPath: string): string =>
+  `Conformance fix loop: ${used} fix round(s) used against a cap of ${cap} (granted rounds included); ` +
+  "escalate to the human with the verdict trail instead of re-looping.\n" +
+  "If the human explicitly approves more rounds, record it and retry as a tasks wave: " +
+  'phase_tracker({ action: "grant_fix_rounds", rounds: <N>, reason: "<their words>" }).\n' +
+  `Last resort: set piGauntlet.closureReview.enforce: false in ${settingsPath} (disables all closure guards; ` +
+  "applies on the next tool call, no restart - a gauntlet_setting read in the same message sees the write; " +
+  "a repo closureReview block replaces the preset's whole block, so restate model and maxFixRounds alongside).";
 
 const closureModelBlockReason = (model: string, missing: number, total: number): string =>
   `Blocked: ${missing} of ${total} conformance-reviewer ${total === 1 ? "dispatch" : "entries"} ` +
@@ -255,7 +261,7 @@ const pathInSpecDirs = (rawPath: string, specDirs: string[]): boolean => {
 };
 
 const PhaseTrackerParams = Type.Object({
-  action: StringEnum(["start", "complete", "skip", "status", "reset", "substep"] as const, {
+  action: StringEnum(["start", "complete", "skip", "status", "reset", "substep", "grant_fix_rounds"] as const, {
     description: "Action to perform",
   }),
   phase: Type.Optional(
@@ -265,7 +271,14 @@ const PhaseTrackerParams = Type.Object({
   ),
   reason: Type.Optional(
     Type.String({
-      description: "Reason for skipping (required for skip action)",
+      description: "Reason (required for skip and grant_fix_rounds; for grant, the human's approval quoted)",
+    }),
+  ),
+  rounds: Type.Optional(
+    Type.Integer({
+      minimum: 1,
+      maximum: Number.MAX_SAFE_INTEGER,
+      description: "Extra fix rounds the human explicitly approved (grant_fix_rounds only)",
     }),
   ),
   force: Type.Optional(
@@ -328,6 +341,7 @@ export default function (pi: ExtensionAPI) {
   let phases: PhaseMap = emptyPhases();
   let conformanceDispatched = false;
   let fixRounds = 0;
+  let fixRoundCredits = 0;
   let gauntletEntered = false;
   // Shared by replay and the live tool_result hook so a resumed session enforces
   // the same budget. Evaluated BEFORE the same result may set the latch, so the
@@ -341,6 +355,7 @@ export default function (pi: ExtensionAPI) {
       isImplementerWave(details, isError) &&
       resolveClosureReview(loadGauntletSettings(ctx.cwd).gauntlet).enforce
     ) {
+      if (fixRoundCredits > 0) fixRoundCredits -= 1;
       fixRounds += 1;
     }
   };
@@ -420,6 +435,7 @@ export default function (pi: ExtensionAPI) {
     phases = emptyPhases();
     conformanceDispatched = false;
     fixRounds = 0;
+    fixRoundCredits = 0;
     gauntletEntered = false;
     planCheckStamp = undefined;
     attemptedRecoveryEdges.clear();
@@ -444,14 +460,17 @@ export default function (pi: ExtensionAPI) {
         const details = msg.details as PhaseTrackerDetails | undefined;
         if (details && !details.error) {
           phases = details.phases;
+          if (details.action === "grant_fix_rounds" && typeof details.rounds === "number") fixRoundCredits = details.rounds;
           gauntletEntered = nextGauntletEntered(gauntletEntered, details.action, details.phases.brainstorm.status);
           if (details.action === "start" && details.phases.implement.status === "in_progress") {
             conformanceDispatched = false;
             fixRounds = 0;
+            fixRoundCredits = 0;
           }
           if (details.action === "reset") {
             conformanceDispatched = false;
             fixRounds = 0;
+            fixRoundCredits = 0;
             planCheckStamp = undefined;
           }
         }
@@ -544,7 +563,12 @@ export default function (pi: ExtensionAPI) {
       }
       if (fixLoopWindow && collectAgents(event.input, "implementer").length > 0) {
         const cap = resolveClosureReview(g()).maxFixRounds;
-        if (fixRounds >= cap) return { block: true, reason: fixRoundCapBlockReason(fixRounds, cap) };
+        if (fixRounds >= cap) {
+          const funded = fixRoundCredits > 0 && (event.input as { async?: unknown })?.async !== true;
+          if (!funded) {
+            return { block: true, reason: fixRoundCapBlockReason(fixRounds, cap, join(ctx.cwd, ".pi", "settings.json")) };
+          }
+        }
       }
       const model = closureReviewModel();
       if (model && !hasAction) {
@@ -730,6 +754,7 @@ export default function (pi: ExtensionAPI) {
     label: "Gauntlet Setting",
     description: "Resolve merged piGauntlet.* settings (repo over preset); for skill use only.",
     parameters: GauntletSettingParams,
+    executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const { gauntlet, errors } = loadGauntletSettings(ctx.cwd);
       const payload =
@@ -914,6 +939,7 @@ export default function (pi: ExtensionAPI) {
           if (params.phase === "implement") {
             conformanceDispatched = false;
             fixRounds = 0;
+            fixRoundCredits = 0;
           }
           gauntletEntered = nextGauntletEntered(gauntletEntered, "start", phases.brainstorm.status);
           firedGuards.clear();
@@ -1080,12 +1106,46 @@ export default function (pi: ExtensionAPI) {
           ) as PhaseMap;
           conformanceDispatched = false;
           fixRounds = 0;
+          fixRoundCredits = 0;
           gauntletEntered = nextGauntletEntered(gauntletEntered, "reset", phases.brainstorm.status);
           firedGuards.clear();
           updateWidget(ctx);
           return {
             content: [{ type: "text", text: "Phase tracker reset. All phases pending." }],
             details: { action: "reset", phases: { ...phases } } as PhaseTrackerDetails,
+          };
+        }
+
+        case "grant_fix_rounds": {
+          const reject = (error: string) => ({
+            content: [{ type: "text" as const, text: `Error: ${error}` }],
+            details: { action: "grant_fix_rounds", phases: { ...phases }, error } as PhaseTrackerDetails,
+          });
+          if (params.rounds === undefined) return reject("grant_fix_rounds requires rounds: a positive integer");
+          const reason = params.reason?.trim() ?? "";
+          if (reason.length === 0) return reject("grant_fix_rounds requires reason: the human's approval, quoted");
+          const closure = resolveClosureReview(loadGauntletSettings(ctx.cwd).gauntlet);
+          const capLive =
+            !isSubagentChild &&
+            gauntletEntered &&
+            phases.verify.status === "in_progress" &&
+            conformanceDispatched &&
+            closure.enforce &&
+            fixRounds >= closure.maxFixRounds;
+          if (!capLive) {
+            return reject(
+              `grant_fix_rounds: no fix-round cap block is active (${fixRounds} used, cap ${closure.maxFixRounds}); nothing to overrule`,
+            );
+          }
+          if (fixRoundCredits > 0) {
+            return reject(`grant_fix_rounds: ${fixRoundCredits} granted round(s) still unused; spend them before granting more`);
+          }
+          fixRoundCredits = params.rounds;
+          return {
+            content: [
+              { type: "text", text: `Granted ${params.rounds} extra fix round(s) - reason: "${reason}"\n${formatStatus(phases)}` },
+            ],
+            details: { action: "grant_fix_rounds", rounds: params.rounds, reason, phases: { ...phases } } as PhaseTrackerDetails,
           };
         }
 
@@ -1160,6 +1220,14 @@ export default function (pi: ExtensionAPI) {
         }
         case "reset":
           return new Text(theme.fg("success", "✓ ") + theme.fg("muted", "Phase tracker reset"), 0, 0);
+        case "grant_fix_rounds":
+          return new Text(
+            theme.fg("success", "+ ") +
+              theme.fg("muted", `${details.rounds} extra fix round(s) granted`) +
+              theme.fg("dim", ` (${details.reason})`),
+            0,
+            0,
+          );
         default:
           return new Text(theme.fg("dim", "Done"), 0, 0);
       }

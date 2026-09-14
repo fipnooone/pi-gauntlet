@@ -58,7 +58,7 @@ const resumedBranch = (rest: Partial<Record<Phase, Status>>) => [
 
 function harness(options: { cwd?: string; branch?: unknown[]; idle?: boolean; beforeSettled?: (setIdle: (idle: boolean) => void) => void; sendThrows?: boolean; model?: { provider: string; id: string }; thinkingLevel?: string } = {}) {
   const handlers = new Map<string, ((event: unknown, ctx: unknown) => unknown)[]>();
-  const tools: { name: string; execute: (...args: any[]) => unknown }[] = [];
+  const tools: { name: string; executionMode?: string; parameters?: any; execute: (...args: any[]) => unknown }[] = [];
   const sent: { message: any; options: any }[] = [];
   let idle = options.idle ?? true;
   let branch = options.branch ?? [];
@@ -76,7 +76,7 @@ function harness(options: { cwd?: string; branch?: unknown[]; idle?: boolean; be
       registered.push(handler);
       handlers.set(event, registered);
     },
-    registerTool(tool: { name: string; executionMode?: string; execute: (...args: any[]) => unknown }) {
+    registerTool(tool: { name: string; executionMode?: string; parameters?: any; execute: (...args: any[]) => unknown }) {
       tools.push(tool);
     },
     sendMessage(message: unknown, sendOptions: unknown) {
@@ -1275,7 +1275,7 @@ test("cap guard: default 3 waves pass, the fourth is blocked with the escalation
   }
   const blocked = await firstCallResult(h, "c4", implementerWave(1));
   assert.equal(blocked?.block, true);
-  assert.match(blocked?.reason ?? "", /fix round 3 of 3 already used; escalate to the human/);
+  assert.match(blocked?.reason ?? "", /3 fix round\(s\) used against a cap of 3 \(granted rounds included\); escalate to the human/);
 });
 
 test("cap guard: maxFixRounds 0 blocks the first wave; 1 blocks the second; a chain implementer is cap-checked and counted", async () => {
@@ -1421,4 +1421,299 @@ test("replay: two implementer waves after the audit in verify restore fixRounds 
   });
   await inShip.emit("session_start");
   assert.equal(await firstCallResult(inShip, "c1", implementerWave(1)), undefined);
+});
+
+// --- Human overrule of the fix-round cap (spec 2026-09-14-fix-round-human-overrule) ---
+
+const grantResult = (rounds: number, reason = "human approved") => ({
+  type: "message",
+  message: { role: "toolResult", toolName: "phase_tracker", details: {
+    action: "grant_fix_rounds", rounds, reason,
+    phases: phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "in_progress" }),
+  } },
+});
+
+const grant = async (h: ReturnType<typeof harness>, id: string, input: Record<string, unknown>) =>
+  (await h.tools.find((t) => t.name === "phase_tracker")!.execute(id, { action: "grant_fix_rounds", ...input }, undefined, undefined, h.ctx)) as {
+    content: { type: string; text: string }[];
+    details: { action: string; rounds?: number; reason?: string; error?: string };
+  };
+
+const exhaust = async (h: ReturnType<typeof harness>, rounds: number, prefix = "x") => {
+  for (let i = 1; i <= rounds; i++) {
+    assert.equal(await firstCallResult(h, `${prefix}${i}`, implementerWave(1)), undefined);
+    await h.emitEvent("tool_result", okWave(`${prefix}${i}`));
+  }
+};
+
+test("grant: funds extra waves and rejects another grant while credits remain", async () => {
+  const h = guardedHarness({ piGauntlet: { closureReview: { enforce: true } } });
+  await h.emit("session_start");
+  await exhaust(h, 3);
+  const res = await grant(h, "g1", { rounds: 2, reason: "I'm approving 2 more rounds" });
+  assert.equal(res.details.error, undefined);
+  assert.deepEqual([res.details.rounds, res.details.reason], [2, "I'm approving 2 more rounds"]);
+  assert.equal((await grant(h, "g2", { rounds: 1, reason: "more" })).details.error, "grant_fix_rounds: 2 granted round(s) still unused; spend them before granting more");
+  await exhaust(h, 2, "c");
+  const blocked = await firstCallResult(h, "c3", implementerWave(1));
+  assert.equal(blocked?.block, true);
+  assert.match(blocked?.reason ?? "", /5 fix round\(s\) used against a cap of 3 \(granted rounds included\)/);
+});
+
+test("grant: schema declares rounds as integer 1..MAX_SAFE_INTEGER; missing rounds or empty reason error without state change", async () => {
+  const h = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } });
+  await h.emit("session_start");
+  const params = h.tools.find((t) => t.name === "phase_tracker")!.parameters;
+  const roundOptions = params.args[0].rounds.args[0].args[0];
+  assert.equal(params.args[0].rounds.args[0].kind, "Integer");
+  assert.deepEqual([roundOptions.minimum, roundOptions.maximum], [1, Number.MAX_SAFE_INTEGER]);
+  assert.ok(params.args[0].action.values.includes("grant_fix_rounds"));
+
+  const noRounds = await grant(h, "g1", { reason: "ok" });
+  assert.equal(noRounds.details.error, "grant_fix_rounds requires rounds: a positive integer");
+  assert.equal(noRounds.details.rounds, undefined);
+  const noReason = await grant(h, "g2", { rounds: 1, reason: "   " });
+  assert.equal(noReason.details.error, "grant_fix_rounds requires reason: the human's approval, quoted");
+  assert.equal(noReason.details.rounds, undefined);
+  assert.equal((await firstCallResult(h, "c1", implementerWave(1)))?.block, true, "no credit was granted");
+});
+
+test("grant: rejected when no cap block is live - before the audit, in implement, below the cap, enforce off, and in a child", async () => {
+  const expectNotLive = async (h: ReturnType<typeof harness>, used: number, cap: number) => {
+    const res = await grant(h, "g", { rounds: 1, reason: "ok" });
+    assert.equal(res.details.error, `grant_fix_rounds: no fix-round cap block is active (${used} used, cap ${cap}); nothing to overrule`);
+  };
+
+  const preAudit = harness({ cwd: tempCwd({ piGauntlet: { closureReview: { maxFixRounds: 0 } } }), branch: verifyBranch() });
+  await preAudit.emit("session_start");
+  await expectNotLive(preAudit, 0, 0);
+
+  const implement = harness({ cwd: tempCwd({ piGauntlet: { closureReview: { maxFixRounds: 0 } } }), branch: implementBranch([subagentResult(["conformance-reviewer"])]) });
+  await implement.emit("session_start");
+  await expectNotLive(implement, 0, 0);
+
+  const below = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 3 } } });
+  await below.emit("session_start");
+  await exhaust(below, 2);
+  await expectNotLive(below, 2, 3);
+
+  const off = guardedHarness({ piGauntlet: { closureReview: { enforce: false, maxFixRounds: 0 } } });
+  await off.emit("session_start");
+  await expectNotLive(off, 0, 0);
+
+  const priorDepth = process.env.PI_SUBAGENT_DEPTH;
+  process.env.PI_SUBAGENT_DEPTH = "1";
+  let child: ReturnType<typeof harness>;
+  try {
+    child = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } });
+  } finally {
+    if (priorDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
+    else process.env.PI_SUBAGENT_DEPTH = priorDepth;
+  }
+  await child.emit("session_start");
+  await expectNotLive(child, 0, 0);
+});
+
+test("grant: only qualifying synchronous parent task waves spend credits", async () => {
+  const h = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } });
+  await h.emit("session_start");
+  await grant(h, "g", { rounds: 1, reason: "ok" });
+  await h.emitEvent("tool_result", waveResult("e1", [{ agent: "code-reviewer", exitCode: 0 }]));
+  await h.emitEvent("tool_result", waveResult("e2", [{ agent: "implementer", exitCode: 0 }], true));
+  await h.emitEvent("tool_result", waveResult("e3", []));
+  assert.equal((await firstCallResult(h, "a", { ...implementerWave(1), async: true }))?.block, true);
+  assert.equal((await firstCallResult(h, "l", loneImplementer()))?.block, true);
+  assert.equal(await firstCallResult(h, "c", implementerWave(1)), undefined);
+  await h.emitEvent("tool_result", okWave("c"));
+  assert.equal((await firstCallResult(h, "d", implementerWave(1)))?.block, true);
+
+  // In a child (PI_SUBAGENT_DEPTH >= 1, fixed at registration) both the cap gate and observeFixWave
+  // are dormant, so credit consumption has no public effect; the observable contract is dormancy.
+  const priorDepth = process.env.PI_SUBAGENT_DEPTH;
+  process.env.PI_SUBAGENT_DEPTH = "1";
+  let child: ReturnType<typeof harness>;
+  try {
+    child = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } }, [grantResult(1), subagentResult(["implementer"])]);
+  } finally {
+    if (priorDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
+    else process.env.PI_SUBAGENT_DEPTH = priorDepth;
+  }
+  await child.emit("session_start");
+  assert.equal(await firstCallResult(child, "child-wave", implementerWave(1)), undefined, "child session: cap gate and observer are dormant, so the replayed grant and implementer result have no observable effect");
+});
+
+test("grant replay restores and spends the recorded pool independent of current cap; rejected grants restore no credit", async () => {
+  const trail = [subagentResult(["implementer"]), subagentResult(["implementer"]), subagentResult(["implementer"]), grantResult(2), subagentResult(["implementer"])];
+  const h = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 3 } } }, trail);
+  await h.emit("session_start");
+  assert.equal(
+    (await grant(h, "g", { rounds: 1, reason: "more" })).details.error,
+    "grant_fix_rounds: 1 granted round(s) still unused; spend them before granting more",
+  );
+  assert.equal(await firstCallResult(h, "c", implementerWave(1)), undefined);
+  await h.emitEvent("tool_result", okWave("c"));
+  const blocked = await firstCallResult(h, "d", implementerWave(1));
+  assert.equal(blocked?.block, true);
+  assert.match(blocked?.reason ?? "", /5 fix round\(s\) used against a cap of 3 \(granted rounds included\)/);
+
+  // Same trail at cap 5: replay yields fixRounds = 4 (cap not live yet); lowering the live cap
+  // exposes the one replayed credit, then wave 5 passes on the counter and wave 6 blocks.
+  const capChanged = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 5 } } }, trail);
+  await capChanged.emit("session_start");
+  assert.equal(
+    (await grant(capChanged, "g", { rounds: 1, reason: "more" })).details.error,
+    "grant_fix_rounds: no fix-round cap block is active (4 used, cap 5); nothing to overrule",
+    "replayed fixRounds = 4 regardless of cap on disk",
+  );
+  // Lower the cap on disk without spending a wave: the block goes live at 4 >= 3 and the grant
+  // probe now reads the replayed pool - exactly one credit, independent of the cap at replay time.
+  writeFileSync(join(capChanged.ctx.cwd, ".pi", "settings.json"), JSON.stringify({ piGauntlet: { closureReview: { maxFixRounds: 3 } } }));
+  assert.equal(
+    (await grant(capChanged, "g2", { rounds: 1, reason: "more" })).details.error,
+    "grant_fix_rounds: 1 granted round(s) still unused; spend them before granting more",
+    "same credits regardless of cap on disk",
+  );
+  writeFileSync(join(capChanged.ctx.cwd, ".pi", "settings.json"), JSON.stringify({ piGauntlet: { closureReview: { maxFixRounds: 5 } } }));
+  assert.equal(await firstCallResult(capChanged, "c", implementerWave(1)), undefined);
+  await capChanged.emitEvent("tool_result", okWave("c"));
+  const blockedAt5 = await firstCallResult(capChanged, "d", implementerWave(1));
+  assert.equal(blockedAt5?.block, true);
+  assert.match(blockedAt5?.reason ?? "", /5 fix round\(s\) used against a cap of 5 \(granted rounds included\)/);
+
+  const rejected = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } }, [{
+    type: "message",
+    message: {
+      role: "toolResult",
+      toolName: "phase_tracker",
+      details: { action: "grant_fix_rounds", error: "grant_fix_rounds requires rounds: a positive integer", phases: phases({ verify: "in_progress" }) },
+    },
+  }]);
+  await rejected.emit("session_start");
+  assert.equal((await firstCallResult(rejected, "c1", implementerWave(1)))?.block, true, "no credits from a rejected grant");
+});
+
+test("grant reset: start implement and reset zero credits (live and replay); start verify --force keeps them", async () => {
+  const settings = { piGauntlet: { closureReview: { maxFixRounds: 0 }, flowGuards: { enforce: false } } };
+
+  const force = guardedHarness(settings, [grantResult(1)]);
+  await force.emit("session_start");
+  await force.tools.find((t) => t.name === "phase_tracker")!.execute("p", { action: "start", phase: "verify", force: true }, undefined, undefined, force.ctx);
+  assert.equal(await firstCallResult(force, "c", implementerWave(1)), undefined);
+
+  const liveImpl = guardedHarness(settings);
+  await liveImpl.emit("session_start");
+  await grant(liveImpl, "g", { rounds: 1, reason: "ok" });
+  const tool = liveImpl.tools.find((t) => t.name === "phase_tracker")!;
+  for (const [id, input] of [
+    ["p1", { action: "skip", phase: "verify", reason: "amendment" }],
+    ["p2", { action: "start", phase: "implement", force: true }],
+    ["p3", { action: "complete", phase: "implement" }],
+    ["p4", { action: "start", phase: "verify", force: true }],
+  ] as const) {
+    assert.equal(((await tool.execute(id, input, undefined, undefined, liveImpl.ctx)) as { details: { error?: string } }).details.error, undefined);
+  }
+  await liveImpl.emitEvent("tool_result", waveResult("audit", [{ agent: "conformance-reviewer", exitCode: 0 }]));
+  assert.equal((await firstCallResult(liveImpl, "c1", implementerWave(1)))?.block, true, "credits zeroed by start implement (cap 0 blocks)");
+
+  const reset = guardedHarness(settings);
+  await reset.emit("session_start");
+  await grant(reset, "g", { rounds: 1, reason: "ok" });
+  const resetTool = reset.tools.find((t) => t.name === "phase_tracker")!;
+  await resetTool.execute("p", { action: "reset" }, undefined, undefined, reset.ctx);
+  assert.match((await grant(reset, "g2", { rounds: 1, reason: "ok" })).details.error ?? "", /no fix-round cap block is active/);
+  for (const [id, input] of [
+    ["p1", { action: "start", phase: "brainstorm" }],
+    ["p2", { action: "complete", phase: "brainstorm" }],
+    ["p3", { action: "start", phase: "plan" }],
+    ["p4", { action: "complete", phase: "plan" }],
+    ["p5", { action: "start", phase: "implement" }],
+    ["p6", { action: "complete", phase: "implement" }],
+    ["p7", { action: "start", phase: "verify" }],
+  ] as const) {
+    assert.equal(((await resetTool.execute(id, input, undefined, undefined, reset.ctx)) as { details: { error?: string } }).details.error, undefined);
+  }
+  await reset.emitEvent("tool_result", waveResult("audit", [{ agent: "conformance-reviewer", exitCode: 0 }]));
+  assert.equal((await firstCallResult(reset, "c1", implementerWave(1)))?.block, true, "credits zeroed by reset (cap 0 blocks)");
+
+  const replayImpl = harness({
+    cwd: tempCwd(settings),
+    branch: verifyBranch([
+      subagentResult(["conformance-reviewer"]),
+      grantResult(1),
+      phaseResult("skip", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "skipped" })),
+      phaseResult("start", phases({ brainstorm: "complete", plan: "complete", implement: "in_progress", verify: "skipped" })),
+      phaseResult("complete", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "skipped" })),
+      phaseResult("start", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "in_progress" })),
+      subagentResult(["conformance-reviewer"]),
+    ]),
+  });
+  await replayImpl.emit("session_start");
+  assert.equal((await firstCallResult(replayImpl, "c1", implementerWave(1)))?.block, true, "replayed start implement zeroed credits");
+
+  const replayReset = harness({
+    cwd: tempCwd(settings),
+    branch: verifyBranch([
+      subagentResult(["conformance-reviewer"]),
+      grantResult(1),
+      phaseResult("reset", phases({})),
+      phaseResult("start", phases({ brainstorm: "in_progress" })),
+      phaseResult("complete", phases({ brainstorm: "complete" })),
+      phaseResult("start", phases({ brainstorm: "complete", plan: "in_progress" })),
+      phaseResult("complete", phases({ brainstorm: "complete", plan: "complete" })),
+      phaseResult("start", phases({ brainstorm: "complete", plan: "complete", implement: "in_progress" })),
+      phaseResult("complete", phases({ brainstorm: "complete", plan: "complete", implement: "complete" })),
+      phaseResult("start", phases({ brainstorm: "complete", plan: "complete", implement: "complete", verify: "in_progress" })),
+      subagentResult(["conformance-reviewer"]),
+    ]),
+  });
+  await replayReset.emit("session_start");
+  assert.equal((await firstCallResult(replayReset, "c1", implementerWave(1)))?.block, true, "replayed reset zeroed credits");
+});
+
+test("grant: block reason gives action, settings path, and live-read guidance", async () => {
+  const h = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } });
+  await h.emit("session_start");
+  const reason = (await firstCallResult(h, "c", implementerWave(1)))?.reason ?? "";
+  assert.match(reason, /phase_tracker\(\{ action: "grant_fix_rounds"/);
+  assert.ok(reason.includes(join(h.ctx.cwd, ".pi", "settings.json")));
+  assert.match(reason, /no restart.*restate model and maxFixRounds/s);
+});
+
+test("gauntlet_setting registration requests sequential execution", () => {
+  assert.equal(harness().tools.find((t) => t.name === "gauntlet_setting")!.executionMode, "sequential");
+});
+
+test("grant renderResult shows count and reason", async () => {
+  const h = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } });
+  await h.emit("session_start");
+  const res = await grant(h, "g", { rounds: 2, reason: "go on" });
+  const tool = h.tools.find((t) => t.name === "phase_tracker")! as any;
+  const rendered = tool.renderResult(res, {}, { fg: (_c: string, s: string) => s, bold: (s: string) => s });
+  assert.match(JSON.stringify(rendered), /2.*go on/);
+});
+
+test("grant: child sessions cannot overrule even a zero cap", async () => {
+  const priorDepth = process.env.PI_SUBAGENT_DEPTH;
+  process.env.PI_SUBAGENT_DEPTH = "1";
+  let child: ReturnType<typeof harness>;
+  try {
+    child = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } });
+  } finally {
+    if (priorDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
+    else process.env.PI_SUBAGENT_DEPTH = priorDepth;
+  }
+  await child.emit("session_start");
+  assert.match((await grant(child, "g", { rounds: 1, reason: "ok" })).details.error ?? "", /no fix-round cap block is active/);
+});
+
+test("grant: accepts MAX_SAFE_INTEGER and current on-disk cap controls whether the block is live", async () => {
+  const h = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } });
+  await h.emit("session_start");
+  const result = await grant(h, "g", { rounds: Number.MAX_SAFE_INTEGER, reason: "approved" });
+  assert.equal(result.details.rounds, Number.MAX_SAFE_INTEGER);
+
+  const changed = guardedHarness({ piGauntlet: { closureReview: { maxFixRounds: 0 } } });
+  await changed.emit("session_start");
+  writeFileSync(join(changed.ctx.cwd, ".pi", "settings.json"), JSON.stringify({ piGauntlet: { closureReview: { maxFixRounds: 1 } } }));
+  assert.match((await grant(changed, "g", { rounds: 1, reason: "ok" })).details.error ?? "", /0 used, cap 1/);
 });

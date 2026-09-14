@@ -22,16 +22,16 @@ const sources = {
     }
   `,
   "@sinclair/typebox": `
-    const schema = (...args) => ({ args });
+    const schema = (kind) => (...args) => ({ kind, args });
     export const Type = {
-      Object: schema,
-      Optional: schema,
-      String: schema,
-      Boolean: schema,
-      Union: schema,
-      Null: schema,
-      Array: schema,
-      Integer: schema,
+      Object: schema("Object"),
+      Optional: schema("Optional"),
+      String: schema("String"),
+      Boolean: schema("Boolean"),
+      Union: schema("Union"),
+      Null: schema("Null"),
+      Array: schema("Array"),
+      Integer: schema("Integer"),
     };
   `,
 };
