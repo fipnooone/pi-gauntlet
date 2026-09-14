@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.5.4 - 2026-09-14
 
 - `phase-tracker`: new `phase_tracker` action `grant_fix_rounds` records an explicit human approval of N more conformance fix rounds (reason quotes the human), accepted only while the cap block is live; each qualifying implementer wave spends one granted round, credits replay with the session and reset with the audit latch. The cap-block message now leads with that action and names the exact `.pi/settings.json` for the `enforce: false` last resort (applies without restart, whole-block precedence).
 - `gauntlet_setting` is registered with sequential execution, so a settings write and a verifying read batched in one message run in order.
