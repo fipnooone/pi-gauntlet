@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.6.0 - 2026-09-16
 
 - `plan-tracker`: pending-suffix rule enforced at runtime - an `update` that would leave a `pending` task ahead of a started or finished one is rejected with a message naming every offending task, the legal fixes, and the current snapshot; state is unchanged and widget replay / `phase_tracker` ignore the rejection. `update` never sets `pending`. New terminal status `skipped` (`⊘`, not applicable in this run, counted done). `init` accepts `{ name, status }` elements (mixable with strings) to recreate a list with known statuses. Registered with sequential execution. Counts are labelled `done` (`complete + skipped`).
 - `phase-tracker`: `implement` auto-completes when every task is `complete` or `skipped`.
