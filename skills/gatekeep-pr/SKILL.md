@@ -83,14 +83,18 @@ configuration.
 
 ## Progress tracking
 
-Use `plan_tracker`, never `phase_tracker`. Init with the stage names: `gather`,
-`provision worktree`, `resolve evidence`, `claim-check`, `review`, `consent menu`.
-Append one task per material claim as the Verifier enumerates them. A passing stage or
-a matched claim -> `complete`. A failed stage or a contradicted claim -> `failed`
-(shown crossed, error color) and stays failed while the skill stops at the menu -
-never marked complete to move on. On a harness without the `plan_tracker` tool: fall
-back to a plain checklist (or skip if none is available); functionality is unchanged
-either way.
+Use `plan_tracker`, never `phase_tracker`. Init with the first four stages:
+`gather`, `provision worktree`, `resolve evidence`, `claim-check`. While
+`claim-check` is `in_progress`, `add` one task per material claim as the
+Verifier enumerates them and record each verdict: a matched claim ->
+`complete`, a contradicted claim -> `failed` (shown crossed, error color).
+Once every claim is terminal and `claim-check` is closed, `add` `review` and
+`consent menu` and continue. Stages are never inited ahead of the claims:
+the tracker rejects a verdict recorded behind a still-pending stage. A
+failed stage or claim stays `failed` while the skill stops at the menu -
+never marked complete to move on. On a harness without the `plan_tracker`
+tool: fall back to a plain checklist (or skip if none is available);
+functionality is unchanged either way.
 
 ## Assessment
 

@@ -171,9 +171,9 @@ Auto-selected at handoff by `writing-plans` (any wave with ≥2 tasks) when the 
 **Progress tracking (`plan_tracker`).** `plan_tracker` is a flat list with no native group concept, so waves are *encoded*, not modeled:
 
 - **Consume, preserve, recover only if absent:** consume the wave-ordered list initialized at writing-plans handoff; indices are positional and stable, so never re-init on continuation or mid-run. Only direct recovery with no tracker initializes the full plan list once before dispatch.
-- **Wave fan-out → `in_progress`:** unconditionally mark every task index in the wave `in_progress` before dispatch. Multiple simultaneous entries are expected (sequential mode has one).
+- **Wave fan-out → `in_progress`:** unconditionally mark every task index in the wave `in_progress` before dispatch, in increasing index order (the tracker validates each call against the previous one and rejects a start while an earlier index is still `pending`). Multiple simultaneous entries are expected (sequential mode has one).
 - **Wave commit → `complete`:** after the wave's gate passes and it commits, unconditionally mark all those same indices `complete`. `complete` = durably committed, so a task in conflict fallback stays `in_progress` until its wave commits.
-- **Lifecycle per task:** `pending → in_progress (wave fan-out) → complete (wave commit)`.
+- **Lifecycle per task:** `pending → in_progress (wave fan-out) → complete (wave commit)`; `failed` when a task ran and did not pass; `skipped` when the plan drops it as not applicable (terminal, counted done). A rejected `update` names the earlier pending tasks and the legal fixes - record those tasks' true state, never `clear` or re-`init` to move on.
 - **Widget caveat (known, deliberately unfixed).** The persistent `plan_tracker` widget's icon strip (`○ → ✓`) and `(c/total)` count reflect every task, but its trailing *name* shows only the **first** `in_progress` task. In parallel mode the icon strip and the `status` action are the full in-flight view; a richer multi-task widget is a separate extension change, out of scope (YAGNI).
 - **Sequential mode:** consume the same existing full list, one `in_progress` index at a time; wave prefixes are harmless.
 

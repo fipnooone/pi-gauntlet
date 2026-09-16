@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import registerPlanTracker from "./plan-tracker.ts";
+import registerPlanTracker, { validateSnapshot } from "./plan-tracker.ts";
 
 type ToolResult = {
   content: { type: string; text: string }[];
@@ -10,6 +10,9 @@ type ToolResult = {
 function harness(branch: unknown[] = []) {
   const tools: {
     name: string;
+    description: string;
+    executionMode?: string;
+    parameters: any;
     execute: (...args: any[]) => unknown;
     renderResult: (result: unknown, options: unknown, theme: unknown) => { text?: string };
   }[] = [];
@@ -39,7 +42,16 @@ function harness(branch: unknown[] = []) {
   const fire = async (event: string) => {
     for (const h of handlers) if (h.event === event) await h.handler({}, ctx);
   };
-  return { call, fire, tool: () => tools[0], theme, widget: () => widgetText };
+  return {
+    call,
+    fire,
+    tool: () => tools[0],
+    theme,
+    widget: () => widgetText,
+    parameters: () => tools[0].parameters,
+    description: () => tools[0].description,
+    executionMode: () => tools[0].executionMode,
+  };
 }
 
 test("add appends pending tasks and preserves existing statuses", async () => {
@@ -95,7 +107,7 @@ test("update to failed round-trips and is excluded from complete count", async (
     res.details.tasks.map((t) => [t.name, t.status]),
     [["a", "complete"], ["b", "failed"], ["c", "pending"]],
   );
-  assert.match(res.content[0].text, /1\/3 complete/);
+  assert.match(res.content[0].text, /1\/3 done/);
   assert.match(res.content[0].text, /1 failed/);
 });
 
@@ -140,11 +152,11 @@ test("widget renders failed as \u2717, keeps failed out of complete count and cu
 test("renderResult status path shows \u2717 for failed and excludes it from complete", async () => {
   const { call, tool, theme } = harness();
   await call({ action: "init", tasks: ["a", "b"] });
-  await call({ action: "update", index: 1, status: "failed" });
+  await call({ action: "update", index: 0, status: "failed" });
   const res = await call({ action: "status" });
   const rendered = tool().renderResult(res as any, {}, theme as any);
   const text = (rendered as any).text as string;
-  assert.match(text, /0\/2 complete/);
+  assert.match(text, /0\/2 done/);
   assert.match(text, /\u2717/);
 });
 
@@ -156,7 +168,7 @@ test("renderResult status header appends failed count when a task has failed", a
   const res = await call({ action: "status" });
   const rendered = tool().renderResult(res as any, {}, theme as any);
   const text = (rendered as any).text as string;
-  assert.match(text, /1\/3 complete, 1 failed/);
+  assert.match(text, /1\/3 done, 1 failed/);
 });
 
 test("renderResult status header omits failed count when no task has failed", async () => {
@@ -166,7 +178,7 @@ test("renderResult status header omits failed count when no task has failed", as
   const res = await call({ action: "status" });
   const rendered = tool().renderResult(res as any, {}, theme as any);
   const text = (rendered as any).text as string;
-  assert.match(text, /^1\/2 complete\n/);
+  assert.match(text, /^1\/2 done\n/);
   assert.doesNotMatch(text, /failed/);
 });
 
@@ -177,7 +189,7 @@ test("renderResult update case appends failed count when a task has failed", asy
   const res = await call({ action: "update", index: 1, status: "failed" });
   const rendered = tool().renderResult(res as any, {}, theme as any);
   const text = (rendered as any).text as string;
-  assert.match(text, /^\u2713 Updated \(1\/3 complete, 1 failed\)$/);
+  assert.match(text, /^\u2713 Updated \(1\/3 done, 1 failed\)$/);
 });
 
 test("renderResult update case omits failed count when no task has failed", async () => {
@@ -186,6 +198,196 @@ test("renderResult update case omits failed count when no task has failed", asyn
   const res = await call({ action: "update", index: 0, status: "complete" });
   const rendered = tool().renderResult(res as any, {}, theme as any);
   const text = (rendered as any).text as string;
-  assert.match(text, /^\u2713 Updated \(1\/2 complete\)$/);
+  assert.match(text, /^\u2713 Updated \(1\/2 done\)$/);
   assert.doesNotMatch(text, /failed/);
+});
+
+const S = (code: string) =>
+  [...code].map((c, i) => ({
+    name: `t${i}`,
+    status: ({ o: "pending", ">": "in_progress", k: "complete", x: "failed", "/": "skipped" } as const)[c as "o" | ">" | "k" | "x" | "/"],
+  }));
+
+test("validateSnapshot: pending must trail every non-pending task", () => {
+  for (const code of ["kkkoo", "kk>>oo", "kk>kk", "x>o", "ooo", "///", "", "k"]) {
+    assert.deepEqual(validateSnapshot(S(code)), [], code);
+  }
+  assert.deepEqual(validateSnapshot(S("okoo")), [0]);
+  assert.deepEqual(validateSnapshot(S("kkk>ookkkk")), [4, 5]);
+  assert.deepEqual(validateSnapshot(S("o>")), [0]);
+  assert.deepEqual(validateSnapshot(S("ook")), [0, 1]);
+});
+
+test("update past a pending index is rejected with every offender, fixes, and the current snapshot", async () => {
+  const { call } = harness();
+  await call({ action: "init", tasks: ["gather", "resolve evidence", "claim-check", "provision worktree", "review", "verify claims"] });
+  for (const i of [0, 1, 2]) await call({ action: "update", index: i, status: "complete" });
+  const res = await call({ action: "update", index: 5, status: "complete" });
+  assert.equal(res.details.error, "pending-suffix violation: 3,4");
+  assert.deepEqual(
+    res.details.tasks.map((t) => t.status),
+    ["complete", "complete", "complete", "pending", "pending", "pending"],
+  );
+  const text = res.content[0].text;
+  assert.equal(
+    text,
+    [
+      'Error: cannot set task 5 "verify claims" to complete: pending tasks precede it: 3 "provision worktree", 4 "review".',
+      "Rule: pending tasks must trail every started or finished task.",
+      "Fix first, then retry: update each listed task to in_progress (working on it now), complete, failed, or skipped (not applicable in this run); or, if the list order itself is wrong, re-init with {name, status}[] keeping every task and its true status so the untouched ones trail.",
+      "Never clear, drop tasks, or record a status the work has not actually reached.",
+      "Current: 0 gather=complete, 1 resolve evidence=complete, 2 claim-check=complete, 3 provision worktree=pending, 4 review=pending, 5 verify claims=pending",
+    ].join("\n"),
+  );
+  const after = await call({ action: "status" });
+  assert.deepEqual(after.details.tasks.map((t) => t.status), ["complete", "complete", "complete", "pending", "pending", "pending"]);
+});
+
+test("update -> pending is rejected in execute and names reopen and re-init", async () => {
+  const { call } = harness();
+  await call({ action: "init", tasks: ["a", "b", "claim-check"] });
+  for (const i of [0, 1, 2]) await call({ action: "update", index: i, status: "complete" });
+  const res = await call({ action: "update", index: 2, status: "pending" });
+  assert.equal(res.details.error, "update cannot set pending");
+  assert.deepEqual(res.details.tasks.map((t) => t.status), ["complete", "complete", "complete"]);
+  assert.equal(
+    res.content[0].text,
+    [
+      'Error: cannot set task 2 "claim-check" to pending: update never sets pending; a task is pending only from init/add.',
+      "To redo it, update it to in_progress. To recreate the whole list, re-init with {name, status}[].",
+      "Current: 0 a=complete, 1 b=complete, 2 claim-check=complete",
+    ].join("\n"),
+  );
+});
+
+test("update at index 0 / first pending index, direct jumps, and reopens are accepted", async () => {
+  const { call } = harness();
+  await call({ action: "init", tasks: ["a", "b", "c", "d"] });
+  assert.equal((await call({ action: "update", index: 0, status: "complete" })).details.error, undefined);
+  assert.equal((await call({ action: "update", index: 1, status: "failed" })).details.error, undefined);
+  assert.equal((await call({ action: "update", index: 2, status: "skipped" })).details.error, undefined);
+  assert.equal((await call({ action: "update", index: 0, status: "in_progress" })).details.error, undefined);
+  assert.equal((await call({ action: "update", index: 1, status: "in_progress" })).details.error, undefined);
+  const res = await call({ action: "status" });
+  assert.deepEqual(res.details.tasks.map((t) => t.status), ["in_progress", "in_progress", "skipped", "pending"]);
+});
+
+test("wave fan-out: in_progress in increasing order succeeds, out of order is rejected naming earlier pending indices", async () => {
+  const ok = harness();
+  await ok.call({ action: "init", tasks: ["a", "b", "c"] });
+  for (const i of [0, 1, 2]) assert.equal((await ok.call({ action: "update", index: i, status: "in_progress" })).details.error, undefined);
+  const bad = harness();
+  await bad.call({ action: "init", tasks: ["a", "b", "c"] });
+  const res = await bad.call({ action: "update", index: 2, status: "in_progress" });
+  assert.equal(res.details.error, "pending-suffix violation: 0,1");
+  assert.match(res.content[0].text, /pending tasks precede it: 0 "a", 1 "b"\./);
+});
+
+test("init: strings, objects, and mixed forms normalize; ordering violation rejects the whole list", async () => {
+  const { call } = harness();
+  const strings = await call({ action: "init", tasks: ["a", "b"] });
+  assert.deepEqual(strings.details.tasks, [{ name: "a", status: "pending" }, { name: "b", status: "pending" }]);
+  const objects = await call({ action: "init", tasks: [{ name: "a", status: "complete" }, { name: "b", status: "skipped" }, "c"] });
+  assert.equal(objects.details.error, undefined);
+  assert.deepEqual(objects.details.tasks, [
+    { name: "a", status: "complete" },
+    { name: "b", status: "skipped" },
+    { name: "c", status: "pending" },
+  ]);
+  const bad = await call({ action: "init", tasks: [{ name: "a", status: "complete" }, "b", { name: "c", status: "complete" }] });
+  assert.equal(bad.details.error, "pending-suffix violation: 1");
+  assert.equal(
+    bad.content[0].text,
+    [
+      'Error: cannot init: pending tasks precede started or finished ones: 1 "b".',
+      "Rule: pending tasks must trail every started or finished task.",
+      "Reorder the list or restate those statuses truthfully, then retry.",
+      "Proposed: 0 a=complete, 1 b=pending, 2 c=complete",
+    ].join("\n"),
+  );
+  assert.doesNotMatch(bad.content[0].text, /Current:/);
+  assert.deepEqual(bad.details.tasks.map((t) => t.status), ["complete", "skipped", "pending"]);
+});
+
+test("init ordering violation with no prior plan leaves no plan", async () => {
+  const { call, widget } = harness();
+  const bad = await call({ action: "init", tasks: ["a", { name: "b", status: "complete" }] });
+  assert.equal(bad.details.error, "pending-suffix violation: 0");
+  assert.deepEqual(bad.details.tasks, []);
+  assert.equal(widget(), undefined);
+});
+
+test("skipped round-trips, replays, renders \u2298, counts as done, and is never current", async () => {
+  const { call, widget, tool, theme } = harness();
+  await call({ action: "init", tasks: ["a", "b", "c"] });
+  await call({ action: "update", index: 0, status: "complete" });
+  const res = await call({ action: "update", index: 1, status: "skipped" });
+  assert.equal(res.details.error, undefined);
+  assert.match(res.content[0].text, /Plan: 2\/3 done \(1 pending, 1 skipped\)/);
+  assert.match(res.content[0].text, /\u2298 \[1\] b/);
+  const w = widget()!;
+  assert.match(w, /\u2298/);
+  assert.match(w, /\(2\/3\)/);
+  assert.match(w, /c$/);
+  const rendered = (tool().renderResult(res as any, {}, theme as any) as any).text as string;
+  assert.match(rendered, /^\u2713 Updated \(2\/3 done, 1 skipped\)$/);
+  const status = await call({ action: "status" });
+  const statusText = (tool().renderResult(status as any, {}, theme as any) as any).text as string;
+  assert.match(statusText, /^2\/3 done, 1 skipped\n/);
+
+  const replay = harness([{ type: "message", message: { role: "toolResult", toolName: "plan_tracker", details: res.details } }]);
+  await replay.fire("session_start");
+  const after = await replay.call({ action: "status" });
+  assert.deepEqual(after.details.tasks.map((t) => t.status), ["complete", "skipped", "pending"]);
+});
+
+test("all tasks skipped renders (M/M)", async () => {
+  const { call, widget } = harness();
+  await call({ action: "init", tasks: ["a", "b"] });
+  await call({ action: "update", index: 0, status: "skipped" });
+  await call({ action: "update", index: 1, status: "skipped" });
+  assert.match(widget()!, /\(2\/2\)/);
+});
+
+test("legacy-invalid snapshot: first update is rejected listing legacy offenders; truthful object-form re-init repairs it", async () => {
+  const branch = [
+    {
+      type: "message",
+      message: {
+        role: "toolResult",
+        toolName: "plan_tracker",
+        details: {
+          action: "update",
+          tasks: [
+            { name: "a", status: "pending" },
+            { name: "b", status: "pending" },
+            { name: "c", status: "complete" },
+          ],
+        },
+      },
+    },
+  ];
+  const { call, fire } = harness(branch);
+  await fire("session_start");
+  const rejected = await call({ action: "update", index: 0, status: "complete" });
+  assert.equal(rejected.details.error, "pending-suffix violation: 1");
+  assert.deepEqual(rejected.details.tasks.map((t) => t.status), ["pending", "pending", "complete"]);
+  const repaired = await call({
+    action: "init",
+    tasks: [{ name: "a", status: "complete" }, { name: "b", status: "skipped" }, { name: "c", status: "complete" }],
+  });
+  assert.equal(repaired.details.error, undefined);
+  assert.deepEqual(repaired.details.tasks.map((t) => t.status), ["complete", "skipped", "complete"]);
+});
+
+test("registration: sequential, tasks schema is Array<Union<String, Object>>, description carries the contract", () => {
+  const { executionMode, parameters, description } = harness();
+  assert.equal(executionMode(), "sequential");
+  const tasksSchema = parameters().args[0].tasks.args[0];
+  assert.equal(tasksSchema.kind, "Array");
+  assert.equal(tasksSchema.args[0].kind, "Union");
+  assert.deepEqual(tasksSchema.args[0].args[0].map((s: { kind: string }) => s.kind), ["String", "Object"]);
+  assert.match(description(), /skipped/);
+  assert.match(description(), /pending tasks must trail every started or finished task/);
+  assert.match(description(), /update never sets pending/);
 });

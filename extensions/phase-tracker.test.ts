@@ -370,6 +370,27 @@ test("all-complete plan activity auto-completes an active implement phase", asyn
   assert.equal(status.details.phases.implement.status, "complete");
 });
 
+test("plan activity auto-completes implement with complete+skipped, not with failed, not from an errored result", async () => {
+  const implementStatus = async (tasks: { status: string }[], isError = false) => {
+    const h = harness({ branch: implementBranch() });
+    await h.emit("session_start");
+    await h.emitEvent("tool_execution_end", {
+      toolName: "plan_tracker",
+      isError,
+      result: { details: { tasks } },
+    });
+    const tool = h.tools.find((t) => t.name === "phase_tracker")!;
+    const status = (await tool.execute("t1", { action: "status" }, undefined, undefined, h.ctx)) as {
+      details: { phases: { implement: { status: string } } };
+    };
+    return status.details.phases.implement.status;
+  };
+  assert.equal(await implementStatus([{ status: "complete" }, { status: "skipped" }]), "complete");
+  assert.equal(await implementStatus([{ status: "skipped" }, { status: "skipped" }]), "complete");
+  assert.equal(await implementStatus([{ status: "complete" }, { status: "failed" }]), "in_progress");
+  assert.equal(await implementStatus([{ status: "complete" }, { status: "skipped" }], true), "in_progress");
+});
+
 test("cold implement and verify completions ignore unfinished snapshots", async () => {
   for (const phase of ["implement", "verify"] as const) {
     const h = harness({

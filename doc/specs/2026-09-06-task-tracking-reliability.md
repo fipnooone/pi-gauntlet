@@ -1,5 +1,7 @@
 # Reliable task tracking with minimal workflow changes
 
+> **Superseded by:** [doc/specs/2026-09-16-plan-tracker-state-contract.md](./2026-09-16-plan-tracker-state-contract.md) - "Scope and non-goals" section only (runtime ordering prohibition and plan-tracker.ts API/status preservation)
+
 ## Context and intent
 
 Task circles in local gauntlet histories remain pending/in-progress after verification and shipping, or skip their start state. The observed omissions exist in persisted tracker results, not merely a renderer. Correct skill bookkeeping and add a narrow completion backstop without redesigning a working gauntlet.

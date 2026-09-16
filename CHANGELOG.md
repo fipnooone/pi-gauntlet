@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `plan-tracker`: pending-suffix rule enforced at runtime - an `update` that would leave a `pending` task ahead of a started or finished one is rejected with a message naming every offending task, the legal fixes, and the current snapshot; state is unchanged and widget replay / `phase_tracker` ignore the rejection. `update` never sets `pending`. New terminal status `skipped` (`⊘`, not applicable in this run, counted done). `init` accepts `{ name, status }` elements (mixable with strings) to recreate a list with known statuses. Registered with sequential execution. Counts are labelled `done` (`complete + skipped`).
+- `phase-tracker`: `implement` auto-completes when every task is `complete` or `skipped`.
+- `check-delivery`, `gatekeep-pr`, `subagent-driven-development`, `brainstorming`: tracker usage aligned with the rule - a skipped stage is `skipped`, gatekeep-pr inits four stages and adds claims/review/consent progressively, wave fan-out marks `in_progress` in increasing index order, the amendment path re-inits with statuses instead of setting tasks back to `pending`.
+
 ## v5.5.4 - 2026-09-14
 
 - `phase-tracker`: new `phase_tracker` action `grant_fix_rounds` records an explicit human approval of N more conformance fix rounds (reason quotes the human), accepted only while the cap block is live; each qualifying implementer wave spends one granted round, credits replay with the session and reset with the audit latch. The cap-block message now leads with that action and names the exact `.pi/settings.json` for the `enforce: false` last resort (applies without restart, whole-block precedence).

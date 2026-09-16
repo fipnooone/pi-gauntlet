@@ -417,7 +417,10 @@ export default function (pi: ExtensionAPI) {
   // skills; plan-tracker tracks tasks independently.
   const applyPlanActivity = (tasks?: { status: string }[]) => {
     if (!tasks || tasks.length === 0) return;
-    if (phases.implement.status === "in_progress" && tasks.every((t) => t.status === "complete")) {
+    if (
+      phases.implement.status === "in_progress" &&
+      tasks.every((t) => t.status === "complete" || t.status === "skipped")
+    ) {
       phases = { ...phases, implement: { status: "complete" } };
       firedGuards.clear();
     }

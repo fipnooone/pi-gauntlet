@@ -125,11 +125,12 @@ configured) all emitted for manual execution, none auto-posted.
 stage plus one task per AC - status mappings below apply only after that
 init: pass / `satisfied` / `not externally observable` /
 `unverified: no delivery target` / `allowed gap` / `proposed descope` ->
-`complete`; failed stage / `unexplained gap` -> `failed`; skipped stage 2 -> `complete`, skip named in
-the task title (e.g. "delivery target - skipped, none configured"), so a
-successful zero-config run still renders finished. Optional-degrading: a
-native task list, or no tracking at all, on harnesses without
-`plan_tracker`; absence is never a hard stop.
+`complete`; failed stage / `unexplained gap` -> `failed`; skipped stage 2 ->
+`skipped` (rendered ⊘, counted as done - never `complete` under a renamed
+title). AC tasks follow the four stage tasks; record each AC verdict while
+stage 3 is `in_progress` - the tracker rejects a verdict recorded behind a
+still-pending stage. Optional-degrading: a native task list, or no tracking
+at all, on harnesses without `plan_tracker`; absence is never a hard stop.
 
 **Stage 0 - Pre-flight.** Fetch the ticket and all comments. Check the
 current tracker status first: if it is already in a terminal/done state,
