@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.6.2 - 2026-09-17
 
 - `brainstorming`: the lookup rule distinguishes current-state facts (looked up) from decisions about what should happen (asked, even when a ticket recorded one earlier); the `Recommendation:` suffix binds questionary questions only, not the skill's git-state, design-round, or spec-gate approvals; the premise note may be questionary question one. Follow-ups from the #32 post-ship assessment. (#32)
 
