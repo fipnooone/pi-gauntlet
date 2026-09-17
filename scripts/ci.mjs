@@ -29,6 +29,12 @@ if (!pkg.name) fail("package.json: missing name");
 if (!/^\d+\.\d+\.\d+/.test(pkg.version || "")) fail(`package.json: bad version "${pkg.version}"`);
 if (pkg.private) fail("package.json: private:true would block publish");
 if (!pkg.license) fail("package.json: missing license field");
+if (pkg.engines?.node !== ">=24.15.0") fail('package.json: engines.node must equal ">=24.15.0"');
+if (pkg.bin?.["gauntlet-spec-index"] !== "bin/gauntlet-spec-index.mjs") fail("package.json: bin.gauntlet-spec-index must point at bin/gauntlet-spec-index.mjs");
+const dependencyKeys = Object.keys(pkg.dependencies || {}).sort();
+if (JSON.stringify(dependencyKeys) !== JSON.stringify(["yaml"])) {
+  fail(`package.json: dependencies must contain exactly "yaml" (got ${dependencyKeys.join(", ") || "none"})`);
+}
 if (!existsSync(R("LICENSE"))) fail("LICENSE file missing");
 if (!existsSync(R("README.md"))) fail("README.md missing (npm shows it on the package page)");
 
@@ -184,6 +190,10 @@ const tokenChecks = [
   ["skills/brainstorming/SKILL.md", "validate each", false],
   ["skills/brainstorming/SKILL.md", "Ask after each", false],
   ["skills/brainstorming/SKILL.md", "200-300-word sections", false],
+  ["skills/brainstorming/SKILL.md", "## Marking superseded specs", false],
+  ["skills/brainstorming/SKILL.md", "#marking-superseded-specs", false],
+  ["skills/brainstorming/gatherer.md", "node <SPEC_INDEX> --query", true],
+  ["skills/brainstorming/SKILL.md", "reference/superseding.md", true],
   ["skills/writing-plans/SKILL.md", "the spec is frozen once planning starts", false],
   // absent (retired rules)
   ["skills/verification-before-completion/reference/conformance-check.md", "always** defers to the finish gate", false],
@@ -225,6 +235,12 @@ for (const [file, tok, want] of tokenChecks) {
 // both probes in roasting-the-spec name ^lean:
 const roastProbeHits = (txt("skills/roasting-the-spec/SKILL.md").match(/`\^lean:` line/g) || []).length;
 if (roastProbeHits < 2) fail(`skills/roasting-the-spec/SKILL.md: expected ^lean: in both member and chair probes, found ${roastProbeHits}`);
+if (!existsSync(R("skills/brainstorming/reference/superseding.md"))) {
+  fail("skills/brainstorming/reference/superseding.md missing");
+}
+if (!existsSync(R("skills/brainstorming/../../bin/gauntlet-spec-index.mjs"))) {
+  fail("gauntlet-spec-index: path from skills/brainstorming does not resolve");
+}
 // touched-files + over-spec in the same paragraph of conformance-check.md
 const ccParas = txt("skills/verification-before-completion/reference/conformance-check.md").split(/\n\s*\n/);
 if (!ccParas.some((p) => p.includes("touched-files") && p.includes("over-spec"))) fail("conformance-check.md: no paragraph carries both `touched-files` and `over-spec`");
@@ -279,12 +295,13 @@ try {
       R("extensions/lib/telemetry-collect.test.ts"),
       R("extensions/lib/telemetry-ship.test.ts"),
       R("extensions/telemetry.test.ts"),
+      R("bin/gauntlet-spec-index.test.mjs"),
     ],
     { stdio: "pipe" },
   );
-  ok("resolver unit tests pass");
+  ok("resolver and gauntlet-spec-index unit tests pass");
 } catch (e) {
-  fail(`resolver unit tests failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
+  fail(`resolver or gauntlet-spec-index unit tests failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
 }
 
 // ---- executable skill examples --------------------------------------------
@@ -391,14 +408,17 @@ try {
 try {
   const out = execFileSync("npm", ["pack", "--dry-run", "--json"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   const packed = JSON.parse(out)[0].files.map((f) => f.path);
-  for (const need of ["extensions/lib/gauntlet-settings.ts", "extensions/lib/gauntlet-settings-loader.ts"]) {
-    if (!packed.includes(need)) fail(`npm pack: ${need} missing from tarball (extension would fail to load at runtime)`);
+  for (const need of [
+    "extensions/lib/gauntlet-settings.ts",
+    "extensions/lib/gauntlet-settings-loader.ts",
+    "bin/gauntlet-spec-index.mjs",
+  ]) {
+    if (!packed.includes(need)) fail(`npm pack: ${need} missing from tarball (runtime would fail)`);
   }
   if (!packed.some((f) => f.startsWith("agents/"))) fail("npm pack: no agents/ in tarball");
-  if (!packed.some((f) => f.startsWith("bin/"))) fail("npm pack: no bin/ in tarball");
   if (packed.some((f) => f.startsWith("doc/"))) fail("npm pack: doc/ leaked into tarball");
   if (packed.some((f) => f.startsWith(".claude-plugin/"))) fail("npm pack: .claude-plugin/ leaked into tarball (Claude Code marketplace is source-only)");
-  ok(`npm pack: ${packed.length} files, agents/ + bin/ present, no doc/ leak`);
+  ok(`npm pack: ${packed.length} files, agents/ + bin/gauntlet-spec-index.mjs present, no doc/ leak`);
 } catch (e) {
   fail(`npm pack failed: ${String(e.stderr || e).split("\n")[0]}`);
 }

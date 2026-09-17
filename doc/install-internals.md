@@ -2,6 +2,8 @@
 
 Deep reference for how `pi install` places pi-gauntlet's personas on disk. See the [README](../README.md) for the standard install commands.
 
+pi-gauntlet requires Node >=24.15.0. This floor provides the release-candidate `node:sqlite` API used by the [spec search index](../README.md#spec-search-index).
+
 ## Symlink vs copy
 
 Pin an exact release with `npm:pi-gauntlet@X.Y.Z`. Pi clones the package, runs `npm install --omit=dev`, which triggers the `postinstall` script. Where personas land depends on the install location:
@@ -21,6 +23,10 @@ pi install -l ~/repos/pi-gauntlet
 Local-path `pi install -l` does not run `npm install` in the checkout, so run it by hand. Its `postinstall` also performs the agent link, so `npm run link-agents` is only needed after pulling agent changes without reinstalling.
 
 After that, edits in `~/repos/pi-gauntlet/` are picked up on next pi launch.
+
+## Spec search cache
+
+The spec search index creates a per-worktree cache at `.pi/gauntlet/index.sqlite` and refreshes it on every query. On first creation it adds `/.pi/gauntlet/index.sqlite*` to Git's `info/exclude`, which also excludes SQLite journal, WAL, and shared-memory sidecars without changing the repository's `.gitignore`.
 
 ## Upgrading from v3.x
 

@@ -116,6 +116,10 @@ pi install npm:pi-gauntlet
 
 Pin an exact release with `npm:pi-gauntlet@X.Y.Z`. See [doc/install-internals.md](./doc/install-internals.md) for what the postinstall step actually does (symlink vs copy, `PI_GAUNTLET_AGENT_DIR`, upgrading from the pre-rename package).
 
+## Spec search index
+
+`gauntlet-spec-index` provides lexical search across `doc/specs/*.md` at the repository root and one service level down. From a repository worktree, run `node <pi-gauntlet-package>/bin/gauntlet-spec-index.mjs --query "<text>" [--limit N]`; it requires Node >=24.15.0, refreshes its FTS5 index on every query, and prints tab-separated `score`, `path`, `service`, `title`, `status`, `shipped_at`, `files`, and `snippet` columns. The per-worktree cache lives at `.pi/gauntlet/index.sqlite`, and its first creation adds `/.pi/gauntlet/index.sqlite*` to Git's `info/exclude` so the database and SQLite sidecars stay out of `git status`.
+
 For local development against a checkout instead of npm:
 
 ```bash

@@ -35,6 +35,10 @@ subagent({
 Absolute `output:` paths are mandatory: relative paths in parallel mode resolve
 against the worktree and would get committed.
 
+`<SPEC_INDEX>` is `<directory of this skill's SKILL.md>/../../bin/gauntlet-spec-index.mjs`,
+resolved to an absolute path by the main loop from the skill's `<location>` in the system prompt
+before pasting the task.
+
 ## Task templates
 
 Scout (always dispatched):
@@ -46,12 +50,21 @@ Scout (always dispatched):
 > exact paths and line ranges. If a spec you cite carries a supersession marker
 > (default: a `> **Superseded by:**` banner; the project's overrides may define
 > another format), follow the successor for the superseded scope and cite it
-> instead; cite the old spec only for its unsuperseded sections. Predecessor
-> check: list the project's spec directory, read titles and `**Goal:**` lines,
-> open at most five whose topic matches this request, and name any whose design
-> this request replaces or amends with the section(s) affected -
-> `Predecessor: <path>, <scope>` - or `Predecessor: none`. Judge by topic; shared
-> file paths never decide. End with an
+> instead; cite the old spec only for its unsuperseded sections (banner contract:
+> `reference/superseding.md`). Predecessor check: compose a 5-15 term keyword query
+> from the request (topic nouns, component names, file names - not stop words; if
+> the request is only a ticket reference, take the terms from the ticket title via
+> the tracker CLI when one is available, otherwise use the fallback below). Run
+> `node <SPEC_INDEX> --query '<keywords>' --limit 10` from the worktree root,
+> keeping the keywords inside single quotes, and treat its rows as the candidate
+> list. If the command fails, fall back to listing the project's spec directory
+> and reading titles and `**Goal:**` lines, and write
+> `Spec index unavailable - predecessor check used directory listing.` in your
+> handoff. Either way open at
+> most five candidates whose topic matches this request, and name any whose design
+> this request replaces or amends with the section(s) affected - `Predecessor:
+> <path>, <scope>` - or `Predecessor: none`. Judge by topic; shared file paths never
+> decide. End with an
 > "Open questions that matter for the spec"
 > section. Compact handoff, not a dump.
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added `gauntlet-spec-index`, a build-on-query FTS5 search over root and one-level service spec corpora with a per-worktree cache and telemetry-enriched tabular results; brainstorming uses it to find predecessor specs. Requires Node >=24.15.0. (#34)
+
 ## v5.8.1 - 2026-09-17
 
 - chase-bug hotfix: the implementer proves its worktree binding first, addresses every mutating git command with `git -C`, runs with a fresh context, and the parent aborts non-destructively on any primary-checkout drift after each implementer return; `ci.mjs` asserts the guard text ([#36](https://github.com/jjuraszek/pi-gauntlet/issues/36))
