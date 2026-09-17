@@ -38,7 +38,8 @@
     "extensions": [
       "./extensions/phase-tracker.ts",
       "./extensions/plan-tracker.ts",
-      "./extensions/verify-before-ship.ts"
+      "./extensions/verify-before-ship.ts",
+      "./extensions/telemetry.ts"
     ],
     "image": "https://raw.githubusercontent.com/jjuraszek/pi-gauntlet/main/pi-gauntlet.png"
   },
@@ -50,5 +51,8 @@
     "postinstall": "node ./bin/install-agents.mjs",
     "link-agents": "node ./bin/install-agents.mjs",
     "test": "node scripts/ci.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
   }
 }

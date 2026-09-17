@@ -8,11 +8,16 @@ import {
   mainLoopModel,
   resolveFlowGuards,
   resolveVerifyBeforeShip,
+  resolveTelemetry,
+  DEFAULT_TELEMETRY_DIR,
+  DEFAULT_TELEMETRY_BUCKETS,
+  DEFAULT_TEST_COMMANDS,
+  buildTestCmdRegex,
   settingsErrorWarning,
   type PiGauntlet,
 } from "./gauntlet-settings.ts";
 
-const DEFAULT_TEST_COMMANDS = ["make ci", "pytest"];
+const CUSTOM_TEST_COMMANDS = ["make ci", "pytest"];
 
 test("mergeGauntlet: repo key replaces preset key whole-object", () => {
   const preset = { specCouncil: { members: ["a"], chair: "c" }, closureReview: { model: "m" } };
@@ -144,13 +149,83 @@ test("settingsErrorWarning: includes prefix and joined errors", () => {
 });
 
 test("verifyBeforeShip: default vs override", () => {
-  const d = resolveVerifyBeforeShip({}, DEFAULT_TEST_COMMANDS);
-  assert.deepEqual(d.testCommands, DEFAULT_TEST_COMMANDS);
+  const d = resolveVerifyBeforeShip({}, CUSTOM_TEST_COMMANDS);
+  assert.deepEqual(d.testCommands, CUSTOM_TEST_COMMANDS);
   assert.equal(d.warningReference, undefined);
   const o = resolveVerifyBeforeShip(
     { verifyBeforeShip: { testCommands: ["x"], warningReference: "doc/t.md" } },
-    DEFAULT_TEST_COMMANDS,
+    CUSTOM_TEST_COMMANDS,
   );
   assert.deepEqual(o.testCommands, ["x"]);
   assert.equal(o.warningReference, "doc/t.md");
+});
+
+test("telemetry: absent block -> enabled, default dir, default buckets, no warning", () => {
+  const r = resolveTelemetry({});
+  assert.equal(r.enabled, true);
+  assert.equal(r.dir, DEFAULT_TELEMETRY_DIR);
+  assert.equal(r.dir, ".pi/gauntlet/telemetry");
+  assert.deepEqual(r.buckets, DEFAULT_TELEMETRY_BUCKETS);
+  assert.equal(r.warning, undefined);
+});
+
+test("telemetry: enabled false is the only way to disable", () => {
+  assert.equal(resolveTelemetry({ telemetry: { enabled: false } }).enabled, false);
+  assert.equal(resolveTelemetry({ telemetry: { enabled: "no" } }).enabled, true);
+  assert.equal(resolveTelemetry({ telemetry: { enabled: 0 } }).enabled, true);
+});
+
+test("telemetry: dir accepts a non-empty relative path, otherwise default + warning", () => {
+  assert.equal(resolveTelemetry({ telemetry: { dir: "telemetry/" } }).dir, "telemetry");
+  assert.equal(resolveTelemetry({ telemetry: { dir: "a/../b" } }).dir, "b");
+  for (const bad of [
+    "",
+    "   ",
+    5,
+    null,
+    ["x"],
+    "/abs/dir",
+    "C:\\outside",
+    "C:/outside",
+    "C:outside",
+    "C:",
+    "\\\\server\\share",
+    "../outside",
+    "a/../../outside",
+    "..",
+  ]) {
+    const r = resolveTelemetry({ telemetry: { dir: bad } });
+    assert.equal(r.dir, DEFAULT_TELEMETRY_DIR);
+    assert.match(r.warning ?? "", /telemetry\.dir/);
+  }
+});
+
+test("telemetry: buckets replaces the default list wholesale, preserving key order", () => {
+  const r = resolveTelemetry({ telemetry: { buckets: { spec: ["doc/specs/**"], test: ["**/*.test.ts"] } } });
+  assert.deepEqual(r.buckets, [
+    ["spec", ["doc/specs/**"]],
+    ["test", ["**/*.test.ts"]],
+  ]);
+  assert.equal(r.warning, undefined);
+});
+
+test("telemetry: malformed buckets -> default + warning", () => {
+  for (const bad of [[], "x", { test: "**/*.ts" }, { test: [""] }, { test: [1] }, {}]) {
+    const r = resolveTelemetry({ telemetry: { buckets: bad } });
+    assert.deepEqual(r.buckets, DEFAULT_TELEMETRY_BUCKETS);
+    assert.match(r.warning ?? "", /telemetry\.buckets/);
+  }
+});
+
+test("telemetry: dir and buckets warnings join with '; '", () => {
+  const r = resolveTelemetry({ telemetry: { dir: 1, buckets: 2 } });
+  assert.match(r.warning ?? "", /telemetry\.dir.*; .*telemetry\.buckets/);
+});
+
+test("DEFAULT_TEST_COMMANDS + buildTestCmdRegex match the documented entrypoints", () => {
+  const re = buildTestCmdRegex(DEFAULT_TEST_COMMANDS);
+  for (const cmd of ["make ci", "make test", "npm test", "npm run test", "pnpm test", "yarn test", "pytest -q", "rspec", "cargo test", "go test ./..."])
+    assert.ok(re.test(cmd), cmd);
+  assert.equal(re.test("make test-smoke"), false);
+  assert.equal(re.test("ls"), false);
 });

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- New extension `telemetry`: records one committed YAML record per gauntlet run at `.pi/gauntlet/telemetry/<spec path>.yaml` (phase timing, model/thinking snapshots, per-persona dispatches and tokens, reviewer findings, gate and fix-round counters, plan totals, last test result, diff buckets and modified files at ship), keyed by spec path and continued across sessions; pathspec-commits the record at checkpoints; reconciles a failed ship command; freezes after squash/PR/discard. During brainstorm a `write` into a spec whose record is shipped is blocked (`edit` passes). Settings `piGauntlet.telemetry.{enabled,dir,buckets}`. (#33)
+- `yaml` is the package's first runtime dependency; CI and local checkouts run `npm install` before the test suite. `verify-before-ship` shares its default test-command list with the resolver module (no behaviour change).
+
 ## v5.7.0 - 2026-09-17
 
 - `gauntlet-resume` (new, human-only, `disable-model-invocation: true`): the sole re-entry point into an interrupted gauntlet flow from a fresh session. Input is a pi-cohort `/handoff` brief (file or pasted; grammar in `skills/gauntlet-resume/reference/brief-contract.md`) or a bare worktree that already holds a spec (`reference/reconstruction.md`). Restores `phase_tracker` / `plan_tracker` state via `start brainstorm` + `skip` with `resume:` reasons, re-runs `plan_check` before implement-or-later, stops a ship-stage brief at verify, never creates a worktree, never infers approval from artifacts. Free-form prompts redirect to `/skill:brainstorming`.

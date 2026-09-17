@@ -113,10 +113,39 @@ Override in `.pi/settings.json`:
 
 `testCommands` entries are regex fragments (anchored with `\b` automatically). `warningReference` is a doc path appended to the warning text — useful for pointing engineers at your testing conventions.
 
+### `telemetry`
+
+A recorder, not a tool. Inside a gauntlet flow it writes one YAML record per spec path at `<git toplevel>/<dir>/<spec path with .md replaced by .yaml>` (default `.pi/gauntlet/telemetry/doc/specs/<spec>.yaml`) and commits it on the current branch with pathspec commits (`git commit -q -m "telemetry: <spec>" -- <record>`) at checkpoints: phase start/complete/skip/reset, `plan_check` pass, ship, discard, session shutdown. Only the parent session writes (children with `PI_SUBAGENT_DEPTH` >= 1 no-op); child usage arrives through the parent's `subagent` results.
+
+The record is `schema: 1`: header (`spec`, `run_id`, `branch`, `status: in_progress | shipped | abandoned`, `created_at`, `approved_at`, `shipped_at`, `abandoned_at`, `supersedes`, `fixes`, `versions`, `author`, `agent_overrides`, `sessions`), then `derived:` (per-phase timing/model/thinking/tokens/compactions/peak context/user messages, per-persona dispatches and tokens, reviewer findings, `conformance_loops` and the most recent `conformance_open_gaps` count, gate counters, plan totals, last test command, amendments, post-ship edits, diff buckets and `modified_files` at ship), then `accumulators:` and `events:` (opaque receipts; events capped at 300). `conformance_open_gaps` is `0` for a `CONFORMS` verdict, counts distinct `G<n>:` blocks otherwise, and is omitted until a conformance result is observed. Consumers read `derived:` only. Unavailable data is omitted, never `null`.
+
+Binding: the first successful `write`/`edit` to `**/doc/specs/*.md` binds the run; a `plan_check` pass confirms it; a fresh session rebinds from branch history. A spec rename at spec-writing moves the record.
+
+Ship: the first `git merge --squash` / `git push` / `gh pr create` while `ship` is in progress sets `shipped_at`, computes the diff summary, commits, then runs; a non-zero exit appends `ship_failed` and clears the shipped state so a retry can succeed. `git worktree remove` / `git branch -D` during ship records `abandoned`. `phase_tracker complete ship` with no ship command (keep the branch) also sets `shipped_at`.
+
+Guard: during `brainstorm`, a `write` to a spec whose record has `shipped_at` is blocked (`edit` passes) with a reason naming the record and asking for a new date-slugged spec that supersedes it. Specs shipped before the extension existed have no record and are unguarded.
+
+Example override (the `buckets` shown replace the defaults):
+
+```json
+{
+  "piGauntlet": {
+    "telemetry": {
+      "enabled": true,
+      "dir": ".pi/gauntlet/telemetry",
+      "buckets": { "test": ["**/test/**", "**/*.test.*"], "docs": ["**/*.md"], "config": ["**/*.json", "**/*.yaml"] }
+    }
+  }
+}
+```
+
+`enabled: false` turns every handler off (no file, no commits, no guard). `dir` is relative to the git toplevel. `buckets` is an ordered `{ name: [globs] }` object matched with `path.matchesGlob` against repo-relative paths; defaults are `test` = `**/test/**`, `**/tests/**`, `**/__tests__/**`, `**/*.test.*`, `**/*.spec.*`, `**/*_test.*`; `docs` = `**/*.md`; `config` = `**/*.json`, `**/*.yaml`, `**/*.yml`, `**/*.toml`, `**/*.lock`, `**/*-lock.*`; anything else `code`; first match wins. Read through the shared `gauntlet-settings` resolver (`resolveTelemetry`).
+
 ## Extensions summary
 
 | Extension | Configurable | Settings key |
-| --- | --- | --- |
-| `plan-tracker.ts` | No | — |
+|---|---|---|
+| `plan-tracker.ts` | No | - |
 | `phase-tracker.ts` | Yes | `settings.json#piGauntlet.closureReview` (keys: `enforce`, `model`, `maxFixRounds`); `settings.json#piGauntlet.flowGuards` (keys: `enforce`, `specDirs`); `settings.json#piGauntlet.specCouncil` (keys: `members`, `chair`); `settings.json#piGauntlet.escalationLoop` (keys: `implModel`) |
 | `verify-before-ship.ts` | Yes | `settings.json#piGauntlet.verifyBeforeShip` (keys: `testCommands`, `warningReference`) |
+| `telemetry.ts` | Yes | `settings.json#piGauntlet.telemetry` (keys: `enabled`, `dir`, `buckets`) |

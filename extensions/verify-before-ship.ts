@@ -25,20 +25,13 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { resolveVerifyBeforeShip, settingsErrorWarning } from "./lib/gauntlet-settings.ts";
+import {
+  DEFAULT_TEST_COMMANDS,
+  buildTestCmdRegex,
+  resolveVerifyBeforeShip,
+  settingsErrorWarning,
+} from "./lib/gauntlet-settings.ts";
 import { loadGauntletSettings } from "./lib/gauntlet-settings-loader.ts";
-
-// Default verification entrypoints. Override via settings.
-const DEFAULT_TEST_COMMANDS = [
-  "make\\s+(?:ci|test)(?![-\\w])", // rejects make test-smoke, test-corpus, etc.
-  "npm\\s+(?:test|run\\s+test)",
-  "pnpm\\s+test",
-  "yarn\\s+test",
-  "pytest",
-  "rspec",
-  "cargo\\s+test",
-  "go\\s+test",
-];
 
 const SHIP_CMD = /\b(git\s+push|gh\s+pr\s+create)\b/;
 
@@ -49,9 +42,6 @@ const isSourceWrite = (filePath: string | undefined): boolean => {
   if (!filePath) return false;
   return SOURCE_EXT.test(filePath) && !TEST_PATH.test(filePath);
 };
-
-const buildTestCmdRegex = (commands: string[]): RegExp =>
-  new RegExp(`\\b(${commands.join("|")})\\b`);
 
 const formatWarning = (command: string, testCommands: string[], reference: string | undefined): string => {
   const examples = testCommands

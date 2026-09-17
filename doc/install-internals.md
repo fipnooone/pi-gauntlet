@@ -13,11 +13,12 @@ Pin an exact release with `npm:pi-gauntlet@X.Y.Z`. Pi clones the package, runs `
 
 ```bash
 git clone git@github.com:jjuraszek/pi-gauntlet.git ~/repos/pi-gauntlet
+cd ~/repos/pi-gauntlet && npm install      # installs the yaml dependency and links the agents
 cd ~/path/to/your/repo
 pi install -l ~/repos/pi-gauntlet
-# Local-path installs skip `npm install`; run the symlink step manually:
-cd ~/repos/pi-gauntlet && npm run link-agents
 ```
+
+Local-path `pi install -l` does not run `npm install` in the checkout, so run it by hand. Its `postinstall` also performs the agent link, so `npm run link-agents` is only needed after pulling agent changes without reinstalling.
 
 After that, edits in `~/repos/pi-gauntlet/` are picked up on next pi launch.
 

@@ -1,3 +1,5 @@
+import path from "node:path";
+
 // Pure gauntlet-settings resolvers. NO pi runtime import: this module is imported
 // by ci.mjs unit tests (node --test) which run outside pi, where
 // @earendil-works/pi-coding-agent is unresolvable. The loader
@@ -9,6 +11,7 @@ export interface PiGauntlet {
   flowGuards?: { enforce?: unknown; specDirs?: unknown };
   verifyBeforeShip?: { testCommands?: unknown; warningReference?: unknown };
   escalationLoop?: { implModel?: unknown };
+  telemetry?: { enabled?: unknown; dir?: unknown; buckets?: unknown };
 }
 
 // Whole-object second-level merge: each piGauntlet key present in the repo layer
@@ -141,6 +144,72 @@ export function resolveVerifyBeforeShip(g: PiGauntlet, defaultTestCommands: stri
       : defaultTestCommands;
   const warningReference = nonEmptyString(vbs?.warningReference) ? vbs!.warningReference.trim() : undefined;
   return { testCommands, warningReference };
+}
+
+// Default verification entrypoints shared by verify-before-ship (advisory) and
+// telemetry (derived.tests). Regex fragments; buildTestCmdRegex anchors them with \b.
+export const DEFAULT_TEST_COMMANDS = [
+  "make\\s+(?:ci|test)(?![-\\w])", // rejects make test-smoke and make test-corpus
+  "npm\\s+(?:test|run\\s+test)",
+  "pnpm\\s+test",
+  "yarn\\s+test",
+  "pytest",
+  "rspec",
+  "cargo\\s+test",
+  "go\\s+test",
+];
+
+export const buildTestCmdRegex = (commands: string[]): RegExp => new RegExp(`\\b(${commands.join("|")})\\b`);
+
+export const DEFAULT_TELEMETRY_DIR = ".pi/gauntlet/telemetry";
+
+// Ordered: first matching bucket wins; anything unmatched is "code".
+export const DEFAULT_TELEMETRY_BUCKETS: [string, string[]][] = [
+  ["test", ["**/test/**", "**/tests/**", "**/__tests__/**", "**/*.test.*", "**/*.spec.*", "**/*_test.*"]],
+  ["docs", ["**/*.md"]],
+  ["config", ["**/*.json", "**/*.yaml", "**/*.yml", "**/*.toml", "**/*.lock", "**/*-lock.*"]],
+];
+
+export interface TelemetryResolved {
+  enabled: boolean;
+  dir: string;
+  buckets: [string, string[]][];
+  warning: string | undefined;
+}
+
+export function resolveTelemetry(g: PiGauntlet): TelemetryResolved {
+  const t = g.telemetry;
+  const warnings: string[] = [];
+  const enabled = t?.enabled !== false;
+
+  let dir = DEFAULT_TELEMETRY_DIR;
+  if (t?.dir !== undefined) {
+    const value = nonEmptyString(t.dir) ? t.dir.trim().replace(/\/+$/, "") : "";
+    const canonical = value.replace(/\\/g, "/");
+    const normalized = path.posix.normalize(canonical);
+    if (
+      value &&
+      path.win32.parse(canonical).root === "" &&
+      normalized !== ".." &&
+      !normalized.startsWith("../")
+    ) dir = normalized;
+    else warnings.push("telemetry.dir must be a non-empty path relative to the git toplevel; using the default");
+  }
+
+  let buckets = DEFAULT_TELEMETRY_BUCKETS;
+  if (t?.buckets !== undefined) {
+    const b = t.buckets;
+    const valid =
+      b !== null &&
+      typeof b === "object" &&
+      !Array.isArray(b) &&
+      Object.keys(b).length > 0 &&
+      Object.values(b).every((v) => Array.isArray(v) && v.length > 0 && v.every(nonEmptyString));
+    if (valid) buckets = Object.entries(b as Record<string, string[]>).map(([name, globs]) => [name, [...globs]]);
+    else warnings.push("telemetry.buckets is not an object of non-empty glob arrays; using the defaults");
+  }
+
+  return { enabled, dir, buckets, warning: joinWarn(warnings) };
 }
 
 export function settingsErrorWarning(errors: string[]): string {

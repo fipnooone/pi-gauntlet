@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Repo validator. Runs in CI on every push and as the release gate.
-// No external deps: uses only Node built-ins so `npm test` needs no install.
+// The validator itself uses only Node built-ins; `npm install` must run first
+// because the telemetry record module and its tests import the `yaml` dependency.
 //
 // Usage:
 //   node scripts/ci.mjs                      # validate repo
@@ -65,6 +66,7 @@ const expectedExtensions = [
   "./extensions/phase-tracker.ts",
   "./extensions/plan-tracker.ts",
   "./extensions/verify-before-ship.ts",
+  "./extensions/telemetry.ts",
 ];
 const extensionEntries = pkg.pi?.extensions;
 if (!Array.isArray(extensionEntries) || extensionEntries.length === 0) {
@@ -235,6 +237,11 @@ try {
       R("extensions/plan-tracker.test.ts"),
       R("extensions/phase-tracker.test.ts"),
       R("extensions/verify-before-ship.test.ts"),
+      R("extensions/lib/telemetry-paths.test.ts"),
+      R("extensions/lib/telemetry-record.test.ts"),
+      R("extensions/lib/telemetry-collect.test.ts"),
+      R("extensions/lib/telemetry-ship.test.ts"),
+      R("extensions/telemetry.test.ts"),
     ],
     { stdio: "pipe" },
   );
