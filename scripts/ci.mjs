@@ -200,10 +200,27 @@ const tokenChecks = [
   ["skills/verification-before-completion/reference/conformance-check.md", "keep `origin: none (scope creep)` verbatim", true],
   ["skills/verification-before-completion/reference/conformance-check.md", "Unavailable: scope creep has no origin requirement to defer", true],
   ["agents/conformance-reviewer.md", "use the literal `none (scope creep)`", true],
+  // #36 hotfix worktree binding
+  ["skills/chase-bug/hotfix.md", 'context: "fresh"', true],
+  ["skills/chase-bug/hotfix.md", "fork context", false],
+  ["skills/chase-bug/hotfix.md", "git -C <WORKTREE>", true],
 ];
 for (const [file, tok, want] of tokenChecks) {
   const has = txt(file).includes(tok);
   if (has !== want) fail(`${file}: token "${tok.trim()}" ${want ? "missing" : "must be absent"}`);
+}
+// #36: the first-command toplevel guard must live inside hotfix.md step 4
+{
+  const hf = txt("skills/chase-bug/hotfix.md");
+  const s = hf.indexOf("4. **Implement.**");
+  const e = hf.indexOf("5. **Test.**");
+  if (s < 0 || e < 0 || e < s) fail("skills/chase-bug/hotfix.md: step 4 / step 5 headings not found in order");
+  else {
+    const step4 = hf.slice(s, e);
+    for (const tok of ["Your first command, before any", "git rev-parse --show-toplevel"]) {
+      if (!step4.includes(tok)) fail(`skills/chase-bug/hotfix.md: step 4 lacks "${tok}"`);
+    }
+  }
 }
 // both probes in roasting-the-spec name ^lean:
 const roastProbeHits = (txt("skills/roasting-the-spec/SKILL.md").match(/`\^lean:` line/g) || []).length;

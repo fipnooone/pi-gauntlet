@@ -1,5 +1,7 @@
 # chase-bug hotfix flow
 
+> **Superseded by:** [doc/specs/2026-09-17-gh-36-hotfix-worktree-binding.md](./2026-09-17-gh-36-hotfix-worktree-binding.md) - decision 5 "Self-containment" only (the `ci.mjs` exclusion)
+
 ## Context
 
 `chase-bug` triages a bug report to an evidenced verdict and offers three real-bug
