@@ -1,6 +1,6 @@
 {
   "name": "pi-gauntlet",
-  "version": "5.8.1",
+  "version": "5.9.0",
   "description": "Opinionated, gated workflow skills, subagent personas, and runtime extensions for the pi coding agent.",
   "author": "Jacek Juraszek",
   "type": "module",
@@ -31,8 +31,12 @@
     "bin",
     "CHANGELOG.md"
   ],
-  "bin": { "gauntlet-spec-index": "bin/gauntlet-spec-index.mjs" },
-  "engines": { "node": ">=24.15.0" },
+  "bin": {
+    "gauntlet-spec-index": "bin/gauntlet-spec-index.mjs"
+  },
+  "engines": {
+    "node": ">=24.15.0"
+  },
   "pi": {
     "skills": [
       "./skills"

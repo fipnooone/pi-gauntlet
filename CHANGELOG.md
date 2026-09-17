@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.9.0 - 2026-09-17
 
 - Added `gauntlet-spec-index`, a build-on-query FTS5 search over root and one-level service spec corpora with a per-worktree cache and telemetry-enriched tabular results; brainstorming uses it to find predecessor specs. Requires Node >=24.15.0. (#34)
 
