@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.9.1 - 2026-09-17
 
 - Process in primary, work by path: `plan_check` roots at the plan's checkout, settings load from the session cwd's checkout toplevel, the branch-switch guard evaluates the command's `-C`/`cd` target, telemetry commits on the spec's checkout, and ship detection accepts `git -C <worktree> push` / `merge --squash`. Stage skills carry the worktree path as a value (dispatch `cwd`, `git -C`, subshell) - a new CI lint keeps them that way; `finishing-a-development-branch` takes `<worktree-path>` as a mandatory argument. Requires git >= 2.31. ([#37](https://github.com/jjuraszek/pi-gauntlet/issues/37))
 
