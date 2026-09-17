@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.6.1 - 2026-09-17
 
 - `brainstorming`: the questionary looks up questions the code, docs, or issue tracker already answer instead of asking; every question it does ask ends with `Recommendation: <answer> - <why>` (including the ask to accept a corrected fact); before approaches, a plain-prose premise note in chat names which design-dependent claims the sources support, disprove (with the corrected fact and where), or leave unverified - a contradicted claim stops the flow until the user accepts the correction or explicitly overrides, with the outcome recorded in the draft. One checklist pointer, one Red Flags entry. (#32)
 - AGENTS core v4: exactness via the example, no inline SHAs, no spiderweb replies.
