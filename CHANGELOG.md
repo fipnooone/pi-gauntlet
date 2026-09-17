@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `brainstorming`: the questionary looks up questions the code, docs, or issue tracker already answer instead of asking; every question it does ask ends with `Recommendation: <answer> - <why>` (including the ask to accept a corrected fact); before approaches, a plain-prose premise note in chat names which design-dependent claims the sources support, disprove (with the corrected fact and where), or leave unverified - a contradicted claim stops the flow until the user accepts the correction or explicitly overrides, with the outcome recorded in the draft. One checklist pointer, one Red Flags entry. (#32)
+- AGENTS core v4: exactness via the example, no inline SHAs, no spiderweb replies.
+
 ## v5.6.0 - 2026-09-16
 
 - `plan-tracker`: pending-suffix rule enforced at runtime - an `update` that would leave a `pending` task ahead of a started or finished one is rejected with a message naming every offending task, the legal fixes, and the current snapshot; state is unchanged and widget replay / `phase_tracker` ignore the rejection. `update` never sets `pending`. New terminal status `skipped` (`⊘`, not applicable in this run, counted done). `init` accepts `{ name, status }` elements (mixable with strings) to recreate a list with known statuses. Registered with sequential execution. Counts are labelled `done` (`complete + skipped`).
