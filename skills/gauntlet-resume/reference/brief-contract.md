@@ -97,7 +97,8 @@ Per-stage call table, keyed by the brief's active phase (`→`). `R` is the reas
 (`reconstruction.md`, "Candidates", including its `flowGuards.specDirs` resolution): the
 single spec/plan pair added after base in the worktree, paired by identical basename
 (`<specDir>/<name>.md` <-> `<sibling plans dir>/<name>.md`, the writing-plans contract);
-zero pairs -> stop; more than one -> human picks.
+resolve the selected plan to an absolute path under the worktree before `plan_check`.
+Zero pairs -> stop; more than one -> human picks.
 
 "Exact" restoration binds: the active phase identity and substep, and the plan task list
 (names, order, statuses) verbatim. Prior phases show `⊘ (resume: ...)` regardless of the

@@ -13,12 +13,12 @@ available" - and never invent Intent or Decisions.
 ## Base
 
 ```bash
-git merge-base HEAD origin/HEAD 2>/dev/null \
-  || git merge-base HEAD main 2>/dev/null \
-  || git merge-base HEAD master 2>/dev/null
+git -C <worktree> merge-base HEAD origin/HEAD 2>/dev/null \
+  || git -C <worktree> merge-base HEAD main 2>/dev/null \
+  || git -C <worktree> merge-base HEAD master 2>/dev/null
 ```
 
-Base = `git merge-base HEAD origin/HEAD`, else `main`/`master`. Empty -> ask the human
+Base = `git -C <worktree> merge-base HEAD origin/HEAD`, else `main`/`master`. Empty -> ask the human
 for a base ref before reading any artifact.
 
 ## Candidates
@@ -29,15 +29,18 @@ else the active pi profile's `settings.json`, else the default `["doc/specs"]` (
 space-separated - never the literal defaults when a setting is present.
 
 ```bash
-git diff --diff-filter=A --name-only <base>..HEAD -- <dirs>
-git ls-files --others --exclude-standard -- <dirs>
+git -C <worktree> diff --diff-filter=A --name-only <base>..HEAD -- <dirs>
+git -C <worktree> ls-files --others --exclude-standard -- <dirs>
 ```
 
 Candidates are files under those directories added after base, plus untracked files
-there. A spec and a plan pair by identical basename (`<specDir>/<name>.md` <->
-`<sibling plans dir>/<name>.md`). The plan commit is the first post-base commit that added the
-plan file: `git log --diff-filter=A --format=%H --reverse <base>..HEAD -- <plan>`, first
-line. An uncommitted plan has no plan commit; treat every task as `pending`.
+there. Paths returned by these commands are relative to `<worktree>`; resolve them to
+absolute paths under `<worktree>` before reading artifacts, showing paths in prompts,
+or calling `plan_check`. A spec and a plan pair by identical basename
+(`<specDir>/<name>.md` <-> `<sibling plans dir>/<name>.md`). The plan commit is the first
+post-base commit that added the plan file: `git -C <worktree> log --diff-filter=A
+--format=%H --reverse <base>..HEAD -- <plan>`, first line. An uncommitted plan has no
+plan commit; treat every task as `pending`.
 
 | Candidates | Route |
 |---|---|
@@ -63,11 +66,12 @@ Show, and ask the human to confirm or edit both in one reply:
 
 1. Per task, in plan order: the commits after the plan commit that touch any path in
    the task's declared `Files:` block. Strip a trailing `:digits[-digits]` range from
-   each `Modify:` path before matching `git log -- <path>`:
-   `git log --format=%h --oneline <plan-commit>..HEAD -- <path>`. Uncommitted plan (no
+   each `Modify:` path before matching `git -C <worktree> log -- <path>`:
+   `git -C <worktree> log --format=%h --oneline <plan-commit>..HEAD -- <path>`.
+   Uncommitted plan (no
    plan commit): skip this query entirely - there is no range to search - and show
    "plan uncommitted; no task evidence" in its place; every task is proposed `pending`.
-2. Uncommitted files: `git status --porcelain`.
+2. Uncommitted files: `git -C <worktree> status --porcelain`.
 3. Proposed task statuses: `complete` iff at least one matching commit, else `pending`.
 4. Proposed stage: `implement` if any task is `pending`, else `verify`.
 
@@ -83,7 +87,7 @@ edits override proposals; never rewrite confirmed state silently.
 After confirmation:
 
 1. `start brainstorm`; `skip brainstorm resume: <spec path>`; `start plan`.
-2. `plan_check` with `planPath` = the plan. FAIL -> print the findings, stop with plan
+2. `plan_check` with `planPath` = the plan's absolute path. FAIL -> print the findings, stop with plan
    in_progress, no `init`.
 3. PASS -> `skip plan` with the same `resume:` reason; for stage verify also
    `skip implement`; `start <stage>`.

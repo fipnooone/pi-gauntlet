@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `gauntlet-resume`: same-repository worktrees resume from a pi session launched in the primary checkout; cross-repository targets still stop, and reconstruction addresses the resolved worktree by path.
+
 ## v5.8.0 - 2026-09-17
 
 - New extension `telemetry`: records one committed YAML record per gauntlet run at `.pi/gauntlet/telemetry/<spec path>.yaml` (phase timing, model/thinking snapshots, per-persona dispatches and tokens, reviewer findings, gate and fix-round counters, plan totals, last test result, diff buckets and modified files at ship), keyed by spec path and continued across sessions; pathspec-commits the record at checkpoints; reconciles a failed ship command; freezes after squash/PR/discard. During brainstorm a `write` into a spec whose record is shipped is blocked (`edit` passes). Settings `piGauntlet.telemetry.{enabled,dir,buckets}`. (#33)

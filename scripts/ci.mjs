@@ -213,6 +213,26 @@ const ccParas = txt("skills/verification-before-completion/reference/conformance
 if (!ccParas.some((p) => p.includes("touched-files") && p.includes("over-spec"))) fail("conformance-check.md: no paragraph carries both `touched-files` and `over-spec`");
 if (errors.length === subtractiveErrorsBefore) ok("subtractive review pass tokens present/absent as specified");
 
+// ---- gauntlet-resume worktree path discipline ------------------------------
+{
+  const resumeErrorsBefore = errors.length;
+  const resumeSkill = txt("skills/gauntlet-resume/SKILL.md");
+  const reconstruction = txt("skills/gauntlet-resume/reference/reconstruction.md");
+  if (!resumeSkill.includes("git -C <worktree> rev-parse --path-format=absolute --git-common-dir")) {
+    fail("gauntlet-resume: entry check 3 must compare the resolved worktree git-common-dir");
+  }
+  if (!resumeSkill.includes("git rev-parse --path-format=absolute --git-common-dir")) {
+    fail("gauntlet-resume: entry check 3 must resolve the session git-common-dir absolutely");
+  }
+  if (resumeSkill.includes("restart pi in <worktree>")) {
+    fail("gauntlet-resume: same-repo worktrees must not require restarting pi in the worktree");
+  }
+  if (/\bgit (?!-C <worktree>)/.test(reconstruction)) {
+    fail("gauntlet-resume reconstruction: git commands must target the resolved worktree with -C");
+  }
+  if (errors.length === resumeErrorsBefore) ok("gauntlet-resume targets same-repo worktrees by path");
+}
+
 // ---- extension syntax (type-stripped parse) --------------------------------
 for (const f of walk(R("extensions")).filter((f) => f.endsWith(".ts"))) {
   try {

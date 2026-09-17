@@ -59,14 +59,18 @@ In order. All before any tracker mutation; entry check 1 is read-only.
    `not a git repo` and no override was given - except a `worktree: no` brief **without**
    process state, which is the brainstorming route in Dispatch, not a stop. Other
    `unavailable` fields inside `## Repo state` are legal.
-3. **Session cwd binding.** `phase_tracker`, `plan_check`, and the flow guards resolve
-   every path against the extension's session cwd; a child-shell `cd` cannot relocate it.
-   If `realpath $(git rev-parse --show-toplevel)` in the session cwd differs from the
-   resolved worktree, stop: "restart pi in <worktree> and re-run". Every restoration
-   therefore runs with the session rooted in the resolved worktree.
+3. **Same-repository binding.** Settings and flow guards come from the repository in
+   the extension's session cwd. Compare
+   `realpath "$(git rev-parse --path-format=absolute --git-common-dir)"` in the session
+   cwd with
+   `realpath "$(git -C <worktree> rev-parse --path-format=absolute --git-common-dir)"`.
+   If they differ, stop, name both paths, and say the resolved worktree belongs to a
+   different repository; restart pi in that repository's primary checkout and re-run.
+   Same-repository worktrees proceed by path: use `git -C <worktree>` for
+   worktree Git commands and absolute artifact paths for `Read` and `plan_check`.
 4. **Drift notice.** Compare the brief's `HEAD` and `dirty` fields in `## Repo state`
-   with the live worktree (`git rev-parse HEAD`, `git status --porcelain`). Announce
-   differences. Informational, never a stop.
+   with the live worktree (`git -C <worktree> rev-parse HEAD`, `git -C <worktree>
+   status --porcelain`). Announce differences. Informational, never a stop.
 5. **Skills loaded.** For each name in `## Skills loaded` (none for
    `## Skills loaded: none`): match against the frontmatter `name` of every
    `skills/*/SKILL.md` in this package; `Read` each match's complete file into the
