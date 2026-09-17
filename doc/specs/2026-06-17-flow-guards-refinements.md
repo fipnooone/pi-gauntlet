@@ -1,5 +1,7 @@
 # Spec: flow-guards refinements (drop the finish nudge, harden worktree guard to a block, drop council bash, fix 2 false positives + a startup-hang)
 
+> **Superseded by:** [doc/specs/2026-09-17-gh-37-worktree-by-path.md](./2026-09-17-gh-37-worktree-by-path.md) - primary-checkout detection for the branch-switch block only
+
 Refines the v3.2.0 flow guards (`doc/specs/2026-06-17-gauntlet-flow-guards.md`) after independent verification against consumer-project session history and a false-positive / feasibility review. Target release: **v3.3.0** (minor - no config-schema break, no agent rename, no extension API removal).
 
 ## Context

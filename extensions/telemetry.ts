@@ -9,12 +9,13 @@
   import { execFile } from "node:child_process";
   import { randomUUID } from "node:crypto";
   import * as nodeFs from "node:fs";
-  import { dirname, join, posix } from "node:path";
+  import { dirname, isAbsolute, join, posix, resolve } from "node:path";
   import * as piRuntime from "@earendil-works/pi-coding-agent";
   import { SettingsManager, getAgentDir } from "@earendil-works/pi-coding-agent";
   import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
   import { DEFAULT_TEST_COMMANDS, resolveTelemetry, settingsErrorWarning, type TelemetryResolved } from "./lib/gauntlet-settings.ts";
   import { loadGauntletSettings } from "./lib/gauntlet-settings-loader.ts";
+  import { checkoutOf } from "./lib/checkout.ts";
   import { CONTEXT_DRAFT_MARKER } from "./lib/phase-tracker-helpers.ts";
   import { sha256 } from "./lib/plan-check.ts";
   import { SUPERSEDED_BY_RE, aggregateNumstat, isPlanPath, isSpecPath, isSupersededByBanner, matchDiscardStatement, matchShipStatement, matchTestStatement, parseSpecLinks, planSpecHeader, recordPathFor, repoRelativeToolPath, toPosix, truncateCommand } from "./lib/telemetry-paths.ts";
@@ -100,9 +101,9 @@
   }
 
   function realSettings(cwd: string): SettingsSnapshot {
-    const { gauntlet, errors } = loadGauntletSettings(cwd);
+    const { gauntlet, errors, root } = loadGauntletSettings(cwd);
     const telemetry = resolveTelemetry(gauntlet);
-    const sm = SettingsManager.create(cwd, getAgentDir());
+    const sm = SettingsManager.create(root, getAgentDir());
     const layer = (s: unknown) => ((s as { subagents?: { agentOverrides?: unknown } })?.subagents?.agentOverrides ?? undefined) as Record<string, unknown> | undefined;
     const preset = layer(sm.getGlobalSettings());
     const repo = layer(sm.getProjectSettings());
@@ -158,8 +159,7 @@
 
   export default function (pi: ExtensionAPI, deps: Deps = realDeps) {
     let phases: PhaseMap = emptyPhases();
-    let toplevel: string | undefined;
-    let inGit = false;
+    let toplevel: string | undefined; // toplevel of the bound record's checkout; undefined until bind
     let boundSpec: string | undefined; // repo-relative
     let record: TelemetryRecord | undefined;
     const predecessorLinks = new Set<string>();
@@ -180,12 +180,13 @@
       return s;
     };
 
-    const ensureToplevel = async (ctx: ExtensionContext): Promise<string> => {
-      if (toplevel) return toplevel;
-      const r = await deps.git(["rev-parse", "--show-toplevel"], ctx.cwd);
-      inGit = r.code === 0 && r.stdout.trim() !== "";
-      toplevel = inGit ? r.stdout.trim() : ctx.cwd;
-      return toplevel;
+    // Resolves a tool path (relative to ctx.cwd or absolute) to its owning checkout and
+    // checkout-relative key. undefined outside any checkout.
+    const locate = async (ctx: ExtensionContext, p: string): Promise<{ toplevel: string; rel: string } | undefined> => {
+      const candidateAbs = isAbsolute(p) ? p : resolve(ctx.cwd, p);
+      const co = await checkoutOf(candidateAbs, deps.git);
+      const rel = co ? repoRelativeToolPath(co.toplevel, ctx.cwd, p) : undefined;
+      return co && rel ? { toplevel: co.toplevel, rel } : undefined;
     };
 
     const live = (): Accumulators => record
@@ -228,7 +229,7 @@
     };
 
     const commitRecord = async () => {
-      if (!record || !recordRel || frozen || !inGit) return;
+      if (!record || !recordRel || frozen || !toplevel) return;
       const text = deps.fs.readFile(abs(recordRel)) ?? "";
       if (text === lastCommitted) return;
       const paths = [recordRel, ...(oldRecordRel ? [oldRecordRel] : [])];
@@ -273,7 +274,8 @@
       return newRecord({ spec: specRel, session: sessionId, now: buffer[0]?.ts ?? deps.now(), runId: randomUUID() });
     };
 
-    const bind = async (specRel: string, snap: SettingsSnapshot) => {
+    const bind = async (specRel: string, snap: SettingsSnapshot, specToplevel: string) => {
+      toplevel = specToplevel;
       currentDir = snap.telemetry.dir;
       boundSpec = specRel;
       recordRel = recordPathFor(currentDir, specRel);
@@ -302,7 +304,6 @@
       const approval = record.events.find((e) => e.kind === "phase" && e.name === "brainstorm" && (e.action === "complete" || e.action === "skip"));
       if (approval) record.approved_at ??= approval.ts;
       buffer = [];
-      if (!inGit) warn("not a git repository: record is written but never committed");
       if (!settingsWarned && (snap.errors.length || snap.telemetry.warning)) {
         settingsWarned = true;
         if (snap.errors.length) warn(settingsErrorWarning(snap.errors));
@@ -312,6 +313,7 @@
     };
 
     const unbind = () => {
+      toplevel = undefined;
       boundSpec = undefined;
       record = undefined;
       recordRel = undefined;
@@ -347,8 +349,8 @@
         warn(`record move skipped: ${to} already exists`);
         return false;
       }
-      const trackedResult = inGit ? await deps.git(["ls-files", "--error-unmatch", "--", from], toplevel!) : undefined;
-      const tracked = trackedResult?.code === 0 && trackedResult.stdout.trim() !== "";
+      const trackedResult = await deps.git(["ls-files", "--error-unmatch", "--", from], toplevel!);
+      const tracked = trackedResult.code === 0 && trackedResult.stdout.trim() !== "";
       try {
         deps.fs.mkdirp(dirname(abs(to)));
         if (tracked) {
@@ -408,14 +410,13 @@
       const snap = enabledSettings(ctx);
       if (!snap) return;
       sessionId = ctx.sessionManager.getSessionId();
-      await ensureToplevel(ctx);
       currentDir = snap.telemetry.dir;
       const replay = replayBranch(ctx.sessionManager.getBranch());
       phases = replay.phases;
       const candidate = replay.planCheckSpec ?? replay.lastSpecWrite;
-      const rel = candidate ? repoRelativeToolPath(toplevel!, ctx.cwd, candidate) : undefined;
-      if (rel && isSpecPath(rel)) {
-        await bind(rel, snap);
+      const loc = candidate ? await locate(ctx, candidate) : undefined;
+      if (loc && isSpecPath(loc.rel)) {
+        await bind(loc.rel, snap, loc.toplevel);
         await flush(false);
       }
     });
@@ -436,19 +437,20 @@
       const snap = enabledSettings(ctx);
       if (!snap) return undefined;
       if (!sessionId) sessionId = ctx.sessionManager.getSessionId();
-      await ensureToplevel(ctx);
       if (event.toolName === "phase_tracker" && !event.isError) {
         await applyPhaseDetails(event.details as never, snap);
         return undefined;
       }
       if (event.toolName === "plan_check" && !event.isError) {
         const d = event.details as { status?: string; specPath?: string; planPath?: string } | undefined;
-        const spec = d?.specPath ? repoRelativeToolPath(toplevel!, ctx.cwd, d.specPath) : undefined;
-        const plan = d?.planPath ? repoRelativeToolPath(toplevel!, ctx.cwd, d.planPath) : undefined;
+        const specLoc = d?.specPath ? await locate(ctx, d.specPath) : undefined;
+        const planLoc = d?.planPath ? await locate(ctx, d.planPath) : undefined;
+        const spec = specLoc?.rel;
+        const plan = planLoc?.rel;
         const pass = d?.status === "pass";
-        if (pass && spec && spec !== boundSpec) {
+        if (pass && specLoc && (specLoc.rel !== boundSpec || specLoc.toplevel !== toplevel)) {
           if (record) unbind();
-          await bind(spec, snap);
+          await bind(specLoc.rel, snap, specLoc.toplevel);
         }
         live().gates.plan_rounds += 1;
         pushEvent({ kind: "plan_check", pass, spec, plan });
@@ -457,9 +459,12 @@
       }
       if ((event.toolName === "write" || event.toolName === "edit" || event.toolName === "read") && !event.isError) {
         const rawPath = (event.input as { path?: unknown }).path;
-        const rel = typeof rawPath === "string" ? repoRelativeToolPath(toplevel!, ctx.cwd, rawPath) : undefined;
-        if (!rel) return undefined;
-        return onSpecInteraction(event.toolName, rel, event, snap);
+        const loc = typeof rawPath === "string" ? await locate(ctx, rawPath) : undefined;
+        if (!loc) {
+          if (typeof rawPath === "string" && isSpecPath(toPosix(rawPath))) warn(`spec ${rawPath} is outside a git checkout; telemetry not recorded`);
+          return undefined;
+        }
+        return onSpecInteraction(event.toolName, loc, event, snap);
       }
       if (event.toolName === "subagent" && !event.isError) {
         await onSubagentResult(event.details, event.content);
@@ -493,20 +498,32 @@
     });
 
     // Binding + spec-write bookkeeping; the bound-spec hooks are defined in block 2.
-    const onSpecInteraction = async (tool: "write" | "edit" | "read", rel: string, event: { input: unknown; content: unknown[] }, snap: SettingsSnapshot): Promise<unknown> => {
+    const onSpecInteraction = async (tool: "write" | "edit" | "read", loc: { toplevel: string; rel: string }, event: { input: unknown; content: unknown[] }, snap: SettingsSnapshot): Promise<unknown> => {
+      const rel = loc.rel;
       if (!boundSpec) {
         if ((tool === "write" || tool === "edit") && isSpecPath(rel)) {
-          await bind(rel, snap);
+          await bind(rel, snap, loc.toplevel);
           const patch = onBoundSpecWrite(tool, rel, event);
           await flush(true);
           return patch;
         } else if (isPlanPath(rel)) {
-          const spec = planSpecHeader(deps.fs.readFile(abs(rel)) ?? "");
-          const specRel = spec ? repoRelativeToolPath(toplevel!, toplevel!, spec) : undefined;
-          if (specRel && deps.fs.exists(abs(specRel))) {
-            await bind(specRel, snap);
+          const spec = planSpecHeader(deps.fs.readFile(join(loc.toplevel, rel)) ?? "");
+          const specRel = spec ? repoRelativeToolPath(loc.toplevel, loc.toplevel, spec) : undefined;
+          if (specRel && deps.fs.exists(join(loc.toplevel, specRel))) {
+            await bind(specRel, snap, loc.toplevel);
             await flush(true);
           }
+        }
+        return undefined;
+      }
+      if (loc.toplevel !== toplevel) {
+        // Another checkout: a fresh run, never a rename of this record.
+        if ((tool === "write" || tool === "edit") && isSpecPath(rel)) {
+          unbind();
+          await bind(rel, snap, loc.toplevel);
+          const patch = onBoundSpecWrite(tool, rel, event);
+          await flush(true);
+          return patch;
         }
         return undefined;
       }
@@ -603,7 +620,7 @@
     let pendingShip: { id: string; option: "squash" | "pr" | "discard" } | undefined;
 
     const computeDiff = async (snap: SettingsSnapshot) => {
-      if (!record || !inGit) return;
+      if (!record || !toplevel) return;
       let baseRef: string | undefined;
       for (const ref of BASE_REFS) {
         if ((await deps.git(["rev-parse", "--verify", "--quiet", ref], toplevel!)).code === 0) {
@@ -665,13 +682,12 @@
       if (event.toolName === "write") {
         const rawPath = (event.input as { path?: unknown }).path;
         if (typeof rawPath === "string" && phases.brainstorm.status === "in_progress") {
-          await ensureToplevel(ctx);
-          const rel = repoRelativeToolPath(toplevel!, ctx.cwd, rawPath);
-          if (rel && isSpecPath(rel)) {
-            const recRel = recordPathFor(snap.telemetry.dir, rel);
-            const existing = deps.fs.readFile(join(toplevel!, recRel));
+          const loc = await locate(ctx, rawPath);
+          if (loc && isSpecPath(loc.rel)) {
+            const recRel = recordPathFor(snap.telemetry.dir, loc.rel);
+            const existing = deps.fs.readFile(join(loc.toplevel, recRel));
             const parsed = existing ? parseRecord(existing) : undefined;
-            if (parsed?.shipped_at) return { block: true, reason: guardReason(rel, parsed.shipped_at, recRel) };
+            if (parsed?.shipped_at) return { block: true, reason: guardReason(loc.rel, parsed.shipped_at, recRel) };
           }
         }
         return undefined;

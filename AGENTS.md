@@ -80,7 +80,7 @@ Any non-trivial change rides the full gauntlet from `/skill:brainstorming` (work
 
 ## Testing
 
-`npm test` runs `scripts/ci.mjs`: AGENTS core block == `AGENTS.core.md`, skill/agent/extension lint, resolver unit tests, `pi.settings` ban, marketplace assertions, `npm pack` contents, and `package.json` version == top `## vX.Y.Z` CHANGELOG heading. CI runs it on every push + PR (`.github/workflows/test.yml`). Local iteration: `pi install -l ~/repos/pi-gauntlet` + `npm run link-agents` ([`doc/install-internals.md`](doc/install-internals.md)).
+`npm test` runs `scripts/ci.mjs`: AGENTS core block == `AGENTS.core.md`, skill/agent/extension lint, stage-skill lint (no `cd`/`--show-toplevel`/'switch into the worktree' in the five stage skills), resolver unit tests, `pi.settings` ban, marketplace assertions, `npm pack` contents, and `package.json` version == top `## vX.Y.Z` CHANGELOG heading. CI runs it on every push + PR (`.github/workflows/test.yml`). Local iteration: `pi install -l ~/repos/pi-gauntlet` + `npm run link-agents` ([`doc/install-internals.md`](doc/install-internals.md)).
 
 ## Release
 

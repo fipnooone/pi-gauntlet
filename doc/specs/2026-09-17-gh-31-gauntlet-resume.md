@@ -1,5 +1,7 @@
 # gauntlet-resume: human-only re-entry into an interrupted gauntlet flow
 
+> **Superseded by:** [doc/specs/2026-09-17-gh-37-worktree-by-path.md](./2026-09-17-gh-37-worktree-by-path.md) - "<primary>" derivation formula and worktree-path resolution in the entry check only
+
 Ticket: https://github.com/jjuraszek/pi-gauntlet/issues/31
 Handoff contract provenance: pi-cohort `doc/handoff-template.md` at worktree `prune-prompts` commit `d737eb9` (not yet on pi-cohort main). The grammar is inlined below; the cohort file is provenance, not a runtime dependency.
 

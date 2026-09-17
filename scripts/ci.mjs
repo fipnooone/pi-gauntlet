@@ -285,6 +285,8 @@ try {
       R("extensions/test-support/pi-stubs.mjs"),
       "--test",
       R("extensions/lib/gauntlet-settings.test.ts"),
+      R("extensions/lib/gauntlet-settings-loader.test.ts"),
+      R("extensions/lib/checkout.test.ts"),
       R("extensions/lib/plan-check.test.ts"),
       R("extensions/lib/phase-tracker-helpers.test.ts"),
       R("extensions/plan-tracker.test.ts"),
@@ -312,6 +314,13 @@ try {
   fail(`Linear download recovery example failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
 }
 
+try {
+  execFileSync(process.execPath, [R("scripts/stage-skill-lint.test.mjs")], { stdio: "pipe" });
+  ok("stage-skill lint fixtures pass");
+} catch (e) {
+  fail(`stage-skill lint fixtures failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
+}
+
 // ---- no ad-hoc settings reads ----------------------------------------------
 {
   const offenders = walk(R("extensions"))
@@ -320,6 +329,18 @@ try {
     .map((f) => f.replace(root + "/", ""));
   if (offenders.length) fail("pi.settings read found (route through the gauntlet-settings helper):\n    " + offenders.join("\n    "));
   else ok("no pi.settings reads in extensions");
+}
+
+// ---- stage skills: process in primary, work by path (#37) ---------------------
+// Fenced `cd` that changes the process cwd, `git rev-parse --show-toplevel` derivation,
+// and "switch into / from inside the worktree" prose are banned in the five stage skills.
+{
+  const { lintStageSkillDirs } = await import("./stage-skill-lint.mjs");
+  const offenders = lintStageSkillDirs(root).map(
+    (hit) => `${hit.file}:${hit.line} [${hit.rule}] ${hit.text}`,
+  );
+  if (offenders.length) fail("stage skills must carry the worktree path, not cd into it:\n    " + offenders.join("\n    "));
+  else ok("stage skills carry the worktree path by value");
 }
 
 // ---- Claude Code marketplace (.claude-plugin/) -------------------------------

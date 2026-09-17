@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Process in primary, work by path: `plan_check` roots at the plan's checkout, settings load from the session cwd's checkout toplevel, the branch-switch guard evaluates the command's `-C`/`cd` target, telemetry commits on the spec's checkout, and ship detection accepts `git -C <worktree> push` / `merge --squash`. Stage skills carry the worktree path as a value (dispatch `cwd`, `git -C`, subshell) - a new CI lint keeps them that way; `finishing-a-development-branch` takes `<worktree-path>` as a mandatory argument. Requires git >= 2.31. ([#37](https://github.com/jjuraszek/pi-gauntlet/issues/37))
+
 ## v5.9.0 - 2026-09-17
 
 - Added `gauntlet-spec-index`, a build-on-query FTS5 search over root and one-level service spec corpora with a per-worktree cache and telemetry-enriched tabular results; brainstorming uses it to find predecessor specs. Requires Node >=24.15.0. (#34)

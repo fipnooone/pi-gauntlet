@@ -3,9 +3,9 @@
 //
 // Ship detection runs on a `bash` `tool_call` while `ship` is in progress and matches
 // the first statement against
-//   STMT_START + (git\s+merge\s+--squash|git\s+push|gh\s+pr\s+create)
+//   STMT_START + git <global flags> (merge --squash | push) | gh pr create
 // and discard against
-//   STMT_START + git\s+(worktree\s+remove|branch\s+-D)
+//   STMT_START + git <global flags> (worktree remove | branch -D)
 // with STMT_START from phase-tracker-helpers.ts:39.
 // Default bucket globs (DEFAULT_TELEMETRY_BUCKETS): test = **/test/**, **/tests/**,
 // **/__tests__/**, **/*.test.*, **/*.spec.*, **/*_test.*; docs = **/*.md;
@@ -40,8 +40,12 @@ export const planSpecHeader = (planBody: string): string | undefined => SPEC_HEA
 
 // ---- command matchers ----------------------------------------------------------
 
-const SHIP_RE = new RegExp(STMT_START + "(git\\s+merge\\s+--squash|git\\s+push|gh\\s+pr\\s+create)");
-const DISCARD_RE = new RegExp(STMT_START + "(git\\s+(?:worktree\\s+remove|branch\\s+-D))");
+// `git <global flags> <subcommand>`: same flags-span grammar as parseGitCommand in
+// phase-tracker-helpers.ts, so `git -C <worktree> push` from the primary checkout counts.
+const GIT_FLAGS = "git\\s+(?:-\\S+(?:\\s+\\S+)?\\s+)*";
+const SHIP_RE = new RegExp(STMT_START + "(" + GIT_FLAGS + "(?:merge\\s+--squash|push)(?=\\s|$)|gh\\s+pr\\s+create)");
+const DISCARD_RE = new RegExp(STMT_START + "(" + GIT_FLAGS + "(?:worktree\\s+remove|branch\\s+-D)(?=\\s|$))");
+const SQUASH_RE = new RegExp("^" + GIT_FLAGS + "merge\\s+--squash");
 const STATEMENT_END = /\n|;|&&|\|\||\|/;
 
 export const truncateCommand = (s: string): string => (s.length > 120 ? s.slice(0, 120) : s);
@@ -59,7 +63,7 @@ export type ShipOption = "squash" | "pr";
 export function matchShipStatement(command: string): { option: ShipOption; statement: string } | undefined {
   const statement = statementAt(command, SHIP_RE);
   if (!statement) return undefined;
-  return { option: /^git\s+merge\s+--squash/.test(statement) ? "squash" : "pr", statement };
+  return { option: SQUASH_RE.test(statement) ? "squash" : "pr", statement };
 }
 
 export const matchDiscardStatement = (command: string): string | undefined => statementAt(command, DISCARD_RE);

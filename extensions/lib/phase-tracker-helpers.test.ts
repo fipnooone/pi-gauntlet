@@ -10,6 +10,7 @@ import {
   implementExemptDirs,
   nextGauntletEntered,
   phaseLabel,
+  parseGitCommand,
   parseGitCommit,
   resolveRepoDir,
   findMarkerFile,
@@ -76,6 +77,22 @@ test("checkSubstep: non-in_progress statuses -> error naming actual status", () 
 test("phaseLabel: with and without substep", () => {
   assert.equal(phaseLabel("brainstorm", "gather"), "brainstorm(gather)");
   assert.equal(phaseLabel("brainstorm", undefined), "brainstorm");
+});
+
+test("parseGitCommand: branch subcommands with and without global flags", () => {
+  const SWITCH = /switch(?=\s|$)/;
+  const CHECKOUT_B = /checkout\s+-[bB](?=\s|$)/;
+  assert.deepEqual(parseGitCommand("git switch -c y", SWITCH), { cPath: undefined, cdPath: undefined });
+  assert.deepEqual(parseGitCommand("git -C .worktrees/x switch -c y", SWITCH), { cPath: ".worktrees/x", cdPath: undefined });
+  assert.deepEqual(parseGitCommand("git --no-pager -C p checkout -b y", CHECKOUT_B), { cPath: "p", cdPath: undefined });
+  assert.deepEqual(parseGitCommand("cd .worktrees/x && git checkout -b y", CHECKOUT_B), { cPath: undefined, cdPath: ".worktrees/x" });
+  assert.equal(parseGitCommand("git checkout file.ts", CHECKOUT_B), undefined);
+  assert.equal(parseGitCommand("git switcheroo", SWITCH), undefined);
+  assert.equal(parseGitCommand("echo git switch", SWITCH), undefined);
+});
+
+test("parseGitCommit is parseGitCommand with the commit subcommand", () => {
+  assert.deepEqual(parseGitCommit("git -C /wt -c user.email=x commit"), parseGitCommand("git -C /wt -c user.email=x commit", /commit(?=\s|$)/));
 });
 
 test("parseGitCommit: plain, -am, chained after &&", () => {

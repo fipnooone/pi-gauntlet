@@ -1,6 +1,7 @@
 ---
 name: finishing-a-development-branch
 description: Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup
+argument-hint: "<worktree-path>"
 ---
 
 # Finishing a Development Branch
@@ -11,9 +12,21 @@ Guide completion of development work by presenting clear options and handling ch
 
 **Core principle:** Verify tests → Detect environment → Surface closure → Present options → Execute choice → Clean up.
 
+## Input
+
+`<worktree-path>` - the absolute path of the worktree to finish, from the `using-git-worktrees` report or the handoff brief. Before anything else - before the announcement and before `phase_tracker` start - if it is missing, stop with "finishing needs the worktree path: /skill:finishing-a-development-branch <worktree-path>" and do nothing else. Derive the primary checkout once:
+
+```bash
+WORKTREE=<worktree-path>
+PRIMARY=$(dirname "$(git -C "$WORKTREE" rev-parse --path-format=absolute --git-common-dir)")
+FEATURE=$(git -C "$WORKTREE" branch --show-current)
+```
+
+The process cwd never changes; every command targets `$WORKTREE` or `$PRIMARY` explicitly.
+
 **Announce at start:** "I'm using the finishing-a-development-branch skill to complete this work."
 
-At start, call `phase_tracker({ action: "start", phase: "ship" })`.
+Then call `phase_tracker({ action: "start", phase: "ship" })`.
 
 ## The Process
 
@@ -21,11 +34,11 @@ At start, call `phase_tracker({ action: "start", phase: "ship" })`.
 
 **Hard verification gate.** Tests/format/lint must pass before presenting any options — including Discard. The user's stated intent to throw the branch away does not change whether the diff is in a verifiable state; verifying first surfaces accidental damage to unrelated code before the branch is gone forever. No exceptions.
 
-Run the project's canonical verification target from inside the worktree. The exact command lives in the repo's `AGENTS.md` or service-level docs (look for "verification", "CI", or "test" sections). Typical patterns: `make ci`, `npm test`, `pytest`, `cargo test`, `bundle exec rspec`. Cross-cutting changes: run each affected service's target; don't skip any.
+Run the project's canonical verification target in the worktree: `(cd "$WORKTREE" && <verification command>)`. The exact command lives in the repo's `AGENTS.md` or service-level docs (look for "verification", "CI", or "test" sections). Typical patterns: `make ci`, `npm test`, `pytest`, `cargo test`, `bundle exec rspec`. Cross-cutting changes: run each affected service's target; don't skip any.
 
 **Scoping caveat — pre-existing findings.** Some services carry lint findings unrelated to the diff. If verification fails on lines you didn't touch:
 
-1. Confirm with `git diff <base>...HEAD --name-only` that the offending file isn't in your diff.
+1. Confirm with `git -C "$WORKTREE" diff <base>...HEAD --name-only` that the offending file isn't in your diff.
 2. Surface the pre-existing finding to the user as a separate issue — do **not** auto-fix it in this completion ("surface, don't auto-fix").
 3. Proceed only after the user acknowledges.
 
@@ -46,26 +59,13 @@ No documentation prompt here: Documentation impact is decided at spec time (`/sk
 
 ### Step 2: Detect Environment
 
-**Determine workspace state before presenting options:**
-
-```bash
-GIT_DIR=$(cd "$(git rev-parse --git-dir)" 2>/dev/null && pwd -P)
-GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" 2>/dev/null && pwd -P)
-```
-
-This determines which menu to show and how cleanup works:
-
-| State | Menu | Cleanup |
-|-------|------|---------|
-| `GIT_DIR == GIT_COMMON` (normal repo) | Standard 4 options | No worktree to clean up |
-| `GIT_DIR != GIT_COMMON`, named branch | Standard 4 options | Provenance-based (see Step 6) |
-| `GIT_DIR != GIT_COMMON`, detached HEAD | Reduced 3 options (no merge) | No cleanup (externally managed) |
+Detached HEAD (`git -C "$WORKTREE" symbolic-ref -q HEAD` prints nothing) -> reduced 3-option menu (no merge), no cleanup. Otherwise the standard 4 options.
 
 ### Step 3: Determine Base Branch
 
 ```bash
 # Try common base branches
-git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null
+git -C "$WORKTREE" merge-base HEAD main 2>/dev/null || git -C "$WORKTREE" merge-base HEAD master 2>/dev/null
 ```
 
 Or ask: "This branch split from main - is that correct?"
@@ -76,7 +76,7 @@ This is an **enforced disposition gate**, not a surface-only notice. The user is
 
 `verification-before-completion/reference/conformance-check.md` is **canonical** for the durable handoff schema, concern-decomposition rules, the single disposition-availability table, the `UNAUTHORIZED` question text, the `recommended: none` preflight, the freshness rule, and the concern-scoped fix projection. This step owns only **render, response, and execute-order** and consumes the rest by link - it does not restate the availability table, the `UNAUTHORIZED` question, or the preflight prose.
 
-**If no conformance check has run in this flow** (e.g. ad-hoc work that landed without an execution skill): say so, then dispatch a fresh-context `conformance-reviewer` against the origin (spec + verbatim prompt + full diff vs base) per that reference - it owns the audit-time input rule (stage/commit untracked deliverables before auditing). Closing the loop is cheap relative to shipping unverified intent. Route the raw reviewer verdict through the reference's canonical pipeline (gap/concern partition, auto-fix where eligible, concern decomposition, emission of a durable `## Closure / conformance` block), then consume that block through the branching below exactly as a carried handoff.
+**If no conformance check has run in this flow** (e.g. ad-hoc work that landed without an execution skill): say so, then dispatch a fresh-context `conformance-reviewer` with `cwd: "<worktree-path>"` against the origin (spec + verbatim prompt + full diff vs base) per that reference - it owns the audit-time input rule (stage/commit untracked deliverables before auditing). Closing the loop is cheap relative to shipping unverified intent. Route the raw reviewer verdict through the reference's canonical pipeline (gap/concern partition, auto-fix where eligible, concern decomposition, emission of a durable `## Closure / conformance` block), then consume that block through the branching below exactly as a carried handoff.
 
 **Freshness precondition - before any verdict branch, including `CONFORMS`.** The durable block opens with a two-line sentinel: `status: CONFORMS (0 open)` or `status: GAPS (N open)`, then `audited-base: <full HEAD SHA at audit time>`. Read the sentinel, then apply the reference's freshness rule (its `## Closure / conformance` block is the single source): compare `audited-base` to the current working tree; any change, doubt, missing/mismatched sentinel, legacy terse row, or malformed structured reviewer block triggers a fresh audit and replacement of the closure block. Never infer `CONFORMS` from the absence of bullets. Only a clean, valid `status: CONFORMS (0 open)` handoff enters the zero-gap fast path.
 
@@ -165,32 +165,17 @@ Which option?
 #### Option 1: Squash-merge to base
 
 ```bash
-# Get main repo root for CWD safety
-MAIN_ROOT=$(git -C "$(git rev-parse --git-common-dir)/.." rev-parse --show-toplevel)
-cd "$MAIN_ROOT"
-
-# Squash-merge — collapses the feature branch into one commit on base
-git checkout <base-branch>
-git pull
-git merge --squash <feature-branch>
-
-# Plans are ephemeral — delete from the squash. Spec stays.
-git rm doc/plans/<plan-file>.md   # or <service>/doc/plans/<plan-file>.md
-
-# Single commit covering spec + code + review fixes.
-git commit -m "<imperative summary> (ref <ticket-id>)"
-
-# Verify tests on merged result
-<Step 1 command for the service(s) touched>
+git -C "$PRIMARY" checkout <base-branch>
+git -C "$PRIMARY" pull
+git -C "$PRIMARY" merge --squash "$FEATURE"
+git -C "$PRIMARY" rm doc/plans/<plan-file>.md   # or <service>/doc/plans/<plan-file>.md
+git -C "$PRIMARY" commit -m "<imperative summary> (ref <ticket-id>)"
+(cd "$PRIMARY" && <Step 1 command for the service(s) touched>)
 ```
 
 The post-squash re-verify is not optional — `git merge --squash` can surface conflict-resolution mistakes the worktree-side run couldn't catch.
 
-Then: Cleanup worktree (Step 6), then delete branch:
-
-```bash
-git branch -d <feature-branch>
-```
+Cleanup worktree (Step 6), then, if Step 6 removed the worktree, `git -C "$PRIMARY" branch -D "$FEATURE"`.
 
 **No push. No PR.** The squashed commit stays local on `<base-branch>` unless the user explicitly asks to push.
 
@@ -199,22 +184,22 @@ git branch -d <feature-branch>
 ```bash
 # Plans are ephemeral - if one was committed on this branch, remove it before the PR diff is opened.
 PLAN_PATH=doc/plans/<plan-file>.md   # or <service>/doc/plans/<plan-file>.md
-if git ls-files --error-unmatch "$PLAN_PATH" >/dev/null 2>&1; then
-  git rm "$PLAN_PATH" && git commit -m "Remove ephemeral plan doc"
+if git -C "$WORKTREE" ls-files --error-unmatch "$PLAN_PATH" >/dev/null 2>&1; then
+  git -C "$WORKTREE" rm "$PLAN_PATH" && git -C "$WORKTREE" commit -m "Remove ephemeral plan doc"
 fi
 
 # Push branch
-git push -u origin <feature-branch>
+git -C "$WORKTREE" push -u origin "$FEATURE"
 
 # Create PR
-gh pr create --title "<title>" --body "$(cat <<'EOF'
+(cd "$WORKTREE" && gh pr create --title "<title>" --body "$(cat <<'EOF'
 ## Summary
 <2-3 bullets of what changed>
 
 ## Test Plan
 - [ ] <verification steps>
 EOF
-)"
+)")
 ```
 
 **Do NOT clean up worktree** — user needs it alive to iterate on PR feedback.
@@ -239,57 +224,35 @@ Type 'discard' to confirm.
 
 Wait for exact confirmation.
 
-If confirmed:
-```bash
-MAIN_ROOT=$(git -C "$(git rev-parse --git-common-dir)/.." rev-parse --show-toplevel)
-cd "$MAIN_ROOT"
-```
-
-Then: Cleanup worktree (Step 6), then force-delete branch:
-```bash
-git branch -D <feature-branch>
-```
+If confirmed: Cleanup worktree (Step 6), then, if Step 6 removed the worktree, `git -C "$PRIMARY" branch -D "$FEATURE"`.
 
 ### Step 6: Cleanup Workspace
 
 **Only runs for Options 1 and 4.** Options 2 and 3 always preserve the worktree.
 
-```bash
-GIT_DIR=$(cd "$(git rev-parse --git-dir)" 2>/dev/null && pwd -P)
-GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" 2>/dev/null && pwd -P)
-WORKTREE_PATH=$(git rev-parse --show-toplevel)
-```
+**If the worktree was created by a project-native script** (e.g. `script/worktree create`, `bin/worktree`): defer to its destroy command, run against the primary: `"$PRIMARY/script/worktree" destroy "${WORKTREE##*/}"`.
 
-**If `GIT_DIR == GIT_COMMON`:** Normal repo, no worktree to clean up. Done.
-
-**If the worktree was created by a project-native script (e.g., `script/worktree create`, `bin/worktree`):** defer to the matching destroy command. The script likely cleans up DBs, env files, or other side-effects that raw `git worktree remove` will miss.
+**If `$WORKTREE` is under `$PRIMARY/.worktrees/` or `~/.worktrees/<project>/`:** gauntlet created it - we own cleanup:
 
 ```bash
-MAIN_ROOT=$(git -C "$(git rev-parse --git-common-dir)/.." rev-parse --show-toplevel)
-name="${WORKTREE_PATH##*-}"
-# Example: project-native wrapper. Substitute your project's destroy command.
-"$MAIN_ROOT/script/worktree" destroy "$name"
+git -C "$PRIMARY" worktree remove "$WORKTREE"
+git -C "$PRIMARY" worktree prune
 ```
 
-**If worktree path is under `.worktrees/` or `~/.worktrees/<project>/`:** Gauntlet created this worktree — we own cleanup.
+Removal precedes branch deletion in both options; `git branch -d`/`-D` fails while the worktree still references the branch.
 
-```bash
-MAIN_ROOT=$(git -C "$(git rev-parse --git-common-dir)/.." rev-parse --show-toplevel)
-cd "$MAIN_ROOT"
-git worktree remove "$WORKTREE_PATH"
-git worktree prune  # Self-healing: clean up any stale registrations
-```
-
-**Otherwise:** The host environment (harness) owns this workspace. Do NOT remove it. If your platform provides a workspace-exit tool, use it. Otherwise, leave the workspace in place.
+**Otherwise:** the host environment owns this workspace. Do NOT remove it, and skip the branch deletion that follows - report that the host-owned worktree still holds `$FEATURE`.
 
 ## Quick Reference
 
 | Option | Merge | Push | Keep Worktree | Cleanup Branch | Plan-doc removal |
 |---|---|---|---|---|---|
-| 1. Squash-merge locally | yes (squash) | - | - | yes | yes (unconditional) |
+| 1. Squash-merge locally | yes (squash) | - | - | yes (after Step 6 removal) | yes (unconditional) |
 | 2. Create PR | - | yes | yes | - | yes (guarded, before push) |
 | 3. Keep as-is | - | - | yes | - | - |
-| 4. Discard | - | - | - | yes (force) | - |
+| 4. Discard | - | - | - | yes (force, after Step 6 removal) | - |
+
+A host-owned worktree (Step 6 "Otherwise") keeps both the worktree and the branch.
 
 ## Common Mistakes
 
@@ -309,9 +272,9 @@ git worktree prune  # Self-healing: clean up any stale registrations
 - **Problem:** `git branch -d` fails because worktree still references the branch
 - **Fix:** Merge first, remove worktree, then delete branch
 
-**Running git worktree remove from inside the worktree**
-- **Problem:** Command fails silently when CWD is inside the worktree being removed
-- **Fix:** Always `cd` to main repo root before `git worktree remove`
+**Removing the worktree with the wrong `-C`**
+- **Problem:** `git worktree remove` run against the worktree itself fails
+- **Fix:** `git -C "$PRIMARY" worktree remove "$WORKTREE"`
 
 **Cleaning up harness-owned worktrees**
 - **Problem:** Removing a worktree the harness created causes phantom state
@@ -322,8 +285,8 @@ git worktree prune  # Self-healing: clean up any stale registrations
 - **Fix:** Require typed "discard" confirmation
 
 **Skipping the plan-doc deletion in Options 1 and 2 (any path that lands on base)**
-- **Problem:** Plan docs are ephemeral and shouldn't land on `<base-branch>`. Forgetting `git rm doc/plans/<plan-file>.md` ships scaffolding to main.
-- **Fix:** The plan stays in the deleted branch's git history (`git log --all -- doc/plans/...`). Spec stays on `<base-branch>`; plan does not.
+- **Problem:** Plan docs are ephemeral and shouldn't land on `<base-branch>`. Forgetting `git -C "$PRIMARY" rm doc/plans/<plan-file>.md` ships scaffolding to main.
+- **Fix:** The plan stays in the deleted branch's git history (`git -C "$PRIMARY" log --all -- doc/plans/...`). Spec stays on `<base-branch>`; plan does not.
 
 ## Completion
 
@@ -344,18 +307,18 @@ Once the merge (and any deploy) has landed, `/skill:check-delivery <ticket-ref>`
 - Force-push without explicit request
 - Remove a worktree before confirming merge success
 - Clean up worktrees you didn't create (provenance check)
-- Run `git worktree remove` from inside the worktree
+- Run any step without the `<worktree-path>` argument
 - Auto-proceed past an undispositioned carried-open gap
 - Skip the guarded plan-doc removal before push on Option 2 when a plan doc was committed
 
 **Always:**
 - Verify tests before offering options
-- Detect environment before presenting menu
+- Derive `$PRIMARY` and `$FEATURE` from `<worktree-path>` before presenting the menu
 - Present exactly 4 options (or 3 for detached HEAD)
 - Get typed confirmation for Option 4
 - Clean up worktree for Options 1 & 4 only
-- `cd` to main repo root before worktree removal
-- Run `git worktree prune` after removal
+- Target `$PRIMARY` with `git -C` for merge, worktree removal, and branch deletion
+- Run `git -C "$PRIMARY" worktree prune` after removal
 - Surface the closure / conformance verdict as its own section before the options menu
 
 ## Project overrides

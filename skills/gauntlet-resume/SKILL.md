@@ -41,9 +41,7 @@ optional pasted text after the command line.
 | `<brief> <worktree>` | brief plus an explicit worktree override (required when the brief's worktree field is `no`/`unavailable`/not a git repo; must equal the brief's worktree after `realpath` otherwise) |
 | anything else | not a resume input - stop with "this is a new idea - run /skill:brainstorming" |
 
-`<primary>` is the checkout owning `.worktrees/`: `dirname $(git rev-parse --git-common-dir)`
-(not `--show-toplevel`, which returns the linked worktree when run inside one). A pasted
-brief that needs an override uses the file form. This skill never runs `git worktree add`.
+`<primary>` is the checkout owning `.worktrees/`: `dirname "$(git rev-parse --path-format=absolute --git-common-dir)"` run in the session cwd - absolute from any primary subdirectory and from inside a linked worktree (`--show-toplevel` would return the linked worktree there). A bare `<name>` resolves as `<primary>/.worktrees/<name>`. A pasted brief that needs an override uses the file form. This skill never runs `git worktree add`.
 
 ## Entry checks
 

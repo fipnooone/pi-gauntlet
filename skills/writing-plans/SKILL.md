@@ -19,7 +19,7 @@ Before drafting the plan, check `phase_tracker({ action: "status" })`. If `plan`
 
 **Input:** an approved spec in `<project>/doc/specs/<filename>.md` — produced by `/skill:brainstorming` in this session, or restored from another session by `/skill:gauntlet-resume`. Those two are the only entry points.
 
-**Save plans to:** the sibling `doc/plans/` directory next to the spec. The plan filename matches the spec filename exactly — same date, same ticket ID (if any), same topic slug, no `-design` suffix.
+**Save plans to:** the sibling `doc/plans/` directory next to the spec. The plan filename matches the spec filename exactly — same date, same ticket ID (if any), same topic slug, no `-design` suffix. The plan path is absolute under the worktree (`<abs worktree path>/doc/plans/<filename>.md`, the path reported by `using-git-worktrees`), and `plan_check({ planPath })` receives that absolute path - the tool roots its checks at the plan's own checkout, not at the session cwd.
 
 | Spec path | Plan path |
 |---|---|
@@ -161,7 +161,7 @@ Each step is **one action, 2-5 minutes**:
 ---
 ```
 
-The full verification entrypoint appears only on the `**Verification:**` line — see [reference/plan-contract.md § Header-only entrypoint](reference/plan-contract.md). The verify phase reads it from the plan; execution runs `Tests:` commands only.
+The full verification entrypoint appears only on the `**Verification:**` line — see [reference/plan-contract.md § Header-only entrypoint](reference/plan-contract.md). The verify phase reads it from the plan; execution runs `Tests:` commands only. Execution runs it in the worktree via the subshell form `(cd "<abs worktree path>" && <command>)`; the process cwd stays in the primary checkout, and dispatch `cwd` is the worktree path.
 
 ## Task Structure
 
@@ -223,6 +223,8 @@ Each task uses `- [ ]` checkbox steps so execution tools (and humans) can track 
 
 Every code task carries this step (red -> green -> fmt/lint -> commit). Doc-only tasks omit it unless the project formats Markdown.
 
+Task commit steps use bare `git`: the implementer subagent runs with the checkout as its cwd (dispatch `cwd`, or its own worktree in Parallel-Wave Mode), so `git -C` would point at the wrong tree.
+
 **Anchor rules.** See [reference/plan-contract.md § Spec anchors](reference/plan-contract.md). A task with no anchorable requirement omits the `**Spec:**` line and carries a mechanical-task row in `## Spec coverage` — silence is never valid.
 
 ## Spec Coverage Table
@@ -252,7 +254,7 @@ If a decision is genuinely open, put it in an explicit **Open Questions** sectio
 
 After drafting the plan and before announcing it complete, run the deterministic checker, then the judgment checks yourself — not a subagent dispatch.
 
-- **Deterministic checker.** Run `plan_check({ planPath })` on the saved plan. Assess and fix every finding yourself (no human involvement), then re-run until it passes — a pass writes the execution stamp that implement-start verifies mechanically. If the same finding survives 3 fix rounds, convert it to an explicit Open Question and stop (the pre-existing Open-Questions halt, resolved by the human in-session — not a new gate). Findings are defined in [reference/plan-contract.md](reference/plan-contract.md).
+- **Deterministic checker.** Run `plan_check({ planPath: "<abs plan path>" })` on the saved plan. Assess and fix every finding yourself (no human involvement), then re-run until it passes — a pass writes the execution stamp that implement-start verifies mechanically. If the same finding survives 3 fix rounds, convert it to an explicit Open Question and stop (the pre-existing Open-Questions halt, resolved by the human in-session — not a new gate). Findings are defined in [reference/plan-contract.md](reference/plan-contract.md).
 - **Code-vs-anchor sanity.** For each task-owned requirement row, re-read the anchored spec lines and confirm the owner tasks' bodies do what they say - mechanism present, not just the quoted literal. For each `Verification` row, confirm the header command exercises the anchored requirement. Fix the task, don't annotate.
 - **Type / API consistency.** Function signatures and field names that appear in multiple tasks must match exactly. The plan is its own contract — internal contradictions surface as bugs during execution.
 - **Test contract.** Every code task's `Tests:` commands are anchored to its `Test:` path(s); `none:` only where no tests apply; a spec-named seam appears as `via:`, a spec-named fixture path as `Create:`.

@@ -149,7 +149,7 @@ Per round:
    so the implementer deletes the surface **and** the clause/AC line in the same
    fix commit; the re-audit then has no `Rn` for it and no `MISSING` echo. The dispatch adds `SCOPED_TEST_COMMANDS`
    to the gap block: the gap-relevant plan-declared commands, or `none`; on an ad-hoc no-plan path, the project's canonical test command.
-3. **Integrate** serially via `git apply` onto the worktree HEAD, one gap's
+3. **Integrate** serially via `git -C "<conformance-worktree>" apply` onto the worktree HEAD, one gap's
    patch at a time. Commit each per-gap fix with the message **`conformance fix Gn`** (durable,
    `git log`-readable pre-squash) so the finish gate and any revert can identify
    auto-applied fixes; a Convergence repair wave commits as one **`conformance fix CR`**.
@@ -162,8 +162,8 @@ Per round:
    integrated changes. Every re-run or retry inside this loop is itself a
    one-task `tasks` wave (never a lone `agent: "implementer"`) and counts as a
    wave against `maxFixRounds`. A `BLOCKED`/`NEEDS_CONTEXT` return surfaces to the user.
-4. **Scoped tests** on the integrated tree: the round's `SCOPED_TEST_COMMANDS` union. A failure re-enters the failure-handling rules above.
-5. **Re-audit**: foreground re-dispatch `conformance-reviewer` with `async: false` over the fixes **plus** the
+4. **Scoped tests** on the integrated tree: run the round's `SCOPED_TEST_COMMANDS` union as `(cd "<conformance-worktree>" && <command>)`. A failure re-enters the failure-handling rules above.
+5. **Re-audit**: foreground re-dispatch `conformance-reviewer` with `async: false`, `cwd` = the conformance worktree, over the fixes **plus** the
    regression guard (any prior-`DELIVERED` requirement whose `evidence` file
    the fix diff touched). Pass the full prior conformance report (every row,
    including DELIVERED rows and their `evidence` `file:line`) and the round's
@@ -190,8 +190,8 @@ Per round:
 
 **Convergence** — runs after R0 `CONFORMS` and after every `CONFORMS` re-audit. `r0-head` is HEAD when the loop was entered (the R0 dispatch, or the finish-time `fix-now` entry) - the parent of the oldest `conformance fix` commit; `audited-base` stays the last audit's HEAD SHA.
 
-a. Run the full plan-header `Verification` set once (ad-hoc: the project's canonical test command). After R0 `CONFORMS` with no round run, the pre-R0 full run counts.
-b. Dispatch `code-reviewer` directly (foreground, `async: false`, `SCOPED_TEST_COMMANDS: none`) over `git diff <r0-head>..HEAD`; never via `/skill:requesting-code-review`. An empty diff is nothing to review - no dispatch.
+a. Run the full plan-header `Verification` set once as `(cd "<conformance-worktree>" && <command>)` (ad-hoc: the project's canonical test command). After R0 `CONFORMS` with no round run, the pre-R0 full run counts.
+b. Dispatch `code-reviewer` directly (foreground, `async: false`, `cwd` = the conformance worktree, `SCOPED_TEST_COMMANDS: none`) over `git diff <r0-head>..HEAD`; never via `/skill:requesting-code-review`. An empty diff is nothing to review - no dispatch.
 c. Repair items = every failing command from a + every Critical/Moderate finding from b (`Behaviour-change: yes` included; the re-audit is its origin check). None → write the closure block; done. Any at the cap → escalate per step 6 with the test/CR trail (an explicit human approval re-enters via `grant_fix_rounds`, as step 6 describes). Any under the cap → re-enter step 2 as a one-task `tasks` wave: one `implementer` whose task is every repair item verbatim (ownership boundary = the files in `git diff <r0-head>..HEAD`, the CR findings' `touched-files`, and the files each failing command's output names, `SCOPED_TEST_COMMANDS: none`, no `Gn` tracker task, no gap selection), integrate as one `conformance fix CR`, re-audit, then Convergence again. That wave counts against `maxFixRounds`. Later Convergence CRs keep the same `<r0-head>..HEAD` range.
 
 `conformance fix CR` is not a gap fix: it is absent from the `auto-applied fix commits` index and has no `revert conformance fix Gn` action at the finish gate.
@@ -371,7 +371,7 @@ commit to the **current working tree**, not to HEAD (a commit-to-commit diff
 misses staged/unstaged edits when HEAD has not moved). Run two cheap commands:
 
 ```bash
-ROOT=$(git rev-parse --show-toplevel)
+ROOT=<abs worktree path passed in with the audit>
 git -C "$ROOT" diff --stat <audited-base> -- .          # tracked changes since the audited commit (staged + unstaged)
 git -C "$ROOT" status --porcelain --untracked-files=all # new/untracked deliverables
 ```

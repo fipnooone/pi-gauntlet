@@ -54,7 +54,7 @@ mktemp -d   # absolute path, e.g. /tmp/tmp.XXXXXX
 
 Dispatch one member per configured model, in parallel, each writing its critique into that dir. Do **not** read these files' findings content yourself — they are for the chair. The only permitted parent access is the mechanical structural probe below (existence plus header regex, no content ingestion, no adjudication).
 
-Capture the worktree path once (`git rev-parse --show-toplevel`, run from inside the worktree) and pass it as `cwd:` on every dispatch below — a child otherwise inherits pi's launch dir (the primary checkout), not the worktree.
+Pass the worktree path (the value brainstorming carries from the `using-git-worktrees` Step 4 report) as `cwd:` on every dispatch below - a child otherwise inherits pi's launch dir (the primary checkout), not the worktree.
 
 ```
 subagent({

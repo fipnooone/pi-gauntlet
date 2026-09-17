@@ -72,6 +72,22 @@ test("gh pr create warns when unverified", async () => {
   assert.match(warning ?? "", /ran without verification/);
 });
 
+test("git -C <worktree> push and merge --squash are ship events (AC 5)", async () => {
+  for (const cmd of ["git -C /p push -u origin HEAD", "git -C /p merge --squash f"]) {
+    const h = harness();
+    await editSource(h);
+    await h.emitEvent("tool_call", bashCall("s1", cmd));
+    assert.match(warningOf(await h.emitEvent("tool_result", bashResult("s1"))) ?? "", /ran without verification/, cmd);
+  }
+});
+
+test("a quoted mention of git push is not a ship event", async () => {
+  const h = harness();
+  await editSource(h);
+  await h.emitEvent("tool_call", bashCall("q1", 'rg "git push" skills/'));
+  assert.equal((await h.emitEvent("tool_result", bashResult("q1")))[0], undefined);
+});
+
 test("a passing recognised run clears the warning for push", async () => {
   const h = harness();
   await editSource(h);

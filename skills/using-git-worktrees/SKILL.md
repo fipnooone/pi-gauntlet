@@ -20,9 +20,9 @@ Git worktrees create isolated workspaces sharing the same repository, allowing w
 Before doing anything else, check whether you are **already** inside an isolated worktree. Creating a worktree inside another worktree, or inside a submodule, produces silent corruption.
 
 ```bash
-GIT_DIR=$(cd "$(git rev-parse --git-dir)" 2>/dev/null && pwd -P)
-GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" 2>/dev/null && pwd -P)
-BRANCH=$(git branch --show-current)
+read -r GIT_DIR GIT_COMMON <<<"$(git rev-parse --path-format=absolute --git-dir --git-common-dir | tr '\n' ' ')"
+ROOT=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+CURRENT_BRANCH=$(git branch --show-current)
 ```
 
 **Submodule guard:** `GIT_DIR != GIT_COMMON` is also true inside git submodules. Before concluding "already in a worktree," verify you are not in a submodule:
@@ -32,13 +32,15 @@ BRANCH=$(git branch --show-current)
 git rev-parse --show-superproject-working-tree 2>/dev/null
 ```
 
-**If `GIT_DIR != GIT_COMMON` (and not a submodule):** You are already in a linked worktree. Skip to Step 3 (Verify Clean Base). Do NOT create another worktree.
+**If `GIT_DIR != GIT_COMMON` (and not a submodule):** The session already runs inside a linked worktree. Its `$GIT_DIR` is `<primary>/.git/worktrees/<name>`, and `$GIT_DIR/gitdir` contains `<worktree>/.git`, so derive its full path:
 
-Report with branch state:
-- On a branch: "Already in isolated workspace at `<path>` on branch `<name>`."
-- Detached HEAD: "Already in isolated workspace at `<path>` (detached HEAD, externally managed)."
+```bash
+WORKTREE=$(dirname "$(cat "$GIT_DIR/gitdir")")
+```
 
-**If `GIT_DIR == GIT_COMMON` (or in a submodule):** You are in a normal repo checkout. Proceed to Step 1.
+Use `$WORKTREE`, report it in the Step 4 shape (`Worktree ready at <that path>`), create nothing, and continue at Step 3 against that path.
+
+**If `GIT_DIR == GIT_COMMON` (or in a submodule):** You are in the primary checkout. Proceed to Step 1.
 
 ## Step 1 — Announce, Don't Ask (skill-driven work defaults to a worktree)
 
@@ -74,47 +76,49 @@ Only when no native tool exists:
 
 ### 2a. Pick a location
 
-The canonical home is `<repo>/.worktrees/<branch>`. Resolve in this order:
+The canonical home is `<repo>/.worktrees/<branch>`. A project override or wrapper may define another path; otherwise use the canonical home. Do not ask local-vs-global or invent another path.
 
-1. **Project override** — a wrapper/script or a gauntlet overrides worktree path (see Project overrides) (`grep -i worktree README.md AGENTS.md .pi/settings.json .pi/gauntlet-overrides.md gauntlet-overrides.md doc/gauntlet-overrides.md`). Obey it.
-2. **Default** — `<repo>/.worktrees/<branch>`. Create the directory if missing (Step 2b).
-3. **No enclosing repo** — only when there's no repo to anchor `.worktrees/`, fall back to `~/.worktrees/<project>/<branch>`.
+### 2b. Create - gitignore the home first
 
-Don't ask local-vs-global and don't invent other paths — `.worktrees/` is the default.
-
-### 2b. Create — gitignore the home first
-
-Run the Step 3 clean-base check in the source checkout *before* this sequence. `.worktrees/` must be gitignored before a worktree lands inside it. Fold the check into creation:
+Run the Step 3 clean-base check in the source checkout before this sequence. `.worktrees/` must be gitignored before a worktree lands inside it.
 
 ```bash
-ROOT=$(git rev-parse --show-toplevel)
-cd "$ROOT"
-if ! git check-ignore -q .worktrees; then
-  echo ".worktrees/" >> .gitignore
-  git add .gitignore && git commit -m "Ignore .worktrees/" -- .gitignore
+# ROOT is the primary checkout derived in Step 0.
+BRANCH=<new feature branch name>
+if git -C "$ROOT" worktree list --porcelain | grep -qx "worktree $ROOT/.worktrees/$BRANCH"; then
+  : # already exists - emit the Step 4 report, add nothing
+else
+  if ! git -C "$ROOT" check-ignore -q .worktrees; then
+    echo ".worktrees/" >> "$ROOT/.gitignore"
+    git -C "$ROOT" add .gitignore && git -C "$ROOT" commit -m "Ignore .worktrees/" -- .gitignore
+  fi
+  git -C "$ROOT" worktree add "$ROOT/.worktrees/$BRANCH" -b "$BRANCH"
 fi
-git worktree add ".worktrees/$BRANCH_NAME" -b "$BRANCH_NAME"
-cd ".worktrees/$BRANCH_NAME"
+WORKTREE="$ROOT/.worktrees/$BRANCH"
 ```
 
-For the outside-a-repo `~/.worktrees/<project>/` fallback, no .gitignore check applies.
+The process cwd never changes. `$WORKTREE` is the value every later step carries; do not `cd` into it.
 
 ### 2c. Run project setup
 
 ```bash
-if   [ -f pnpm-lock.yaml ]; then pnpm install
-elif [ -f yarn.lock ];      then yarn install
-elif [ -f package.json ];   then npm install
-fi
-[ -f Cargo.toml ]      && cargo build
-[ -f pyproject.toml ]  && uv sync
-[ -f Gemfile ]         && bundle install
-[ -f go.mod ]          && go mod download
+(cd "$WORKTREE" && {
+  if   [ -f pnpm-lock.yaml ]; then pnpm install
+  elif [ -f yarn.lock ];      then yarn install
+  elif [ -f package.json ];   then npm install
+  fi
+  [ -f Cargo.toml ]      && cargo build
+  [ -f pyproject.toml ]  && uv sync
+  [ -f Gemfile ]         && bundle install
+  [ -f go.mod ]          && go mod download
+})
 ```
 
 ### 2d. Sandbox fallback
 
 If worktree creation fails on permissions (read-only filesystem, container sandbox without write to parent dirs): stop, announce the failure, and continue in the current directory on a feature branch.
+
+Working in place is a degraded mode for this skill only; `/skill:finishing-a-development-branch` requires a worktree path and does not finish an in-place branch.
 
 ## Step 3 — Verify Clean Base
 
@@ -122,8 +126,8 @@ The check: bare `git status --porcelain` — untracked files count as dirty. Nev
 
 **When and where it runs:**
 
-- **Fresh creation (Steps 1a/2):** in the source checkout, **before** invoking the wrapper (Step 1a) or the `git worktree add` sequence (Step 2b) — pre-creation, the current directory *is* the source checkout, so no `$ROOT` plumbing or `git worktree list` derivation is needed. Those steps point here; this section defines the check.
-- **Already in a worktree (Step 0):** the same check against the current worktree, on arrival at this step.
+- **Fresh creation (Steps 1a/2):** in the source checkout, **before** invoking the wrapper (Step 1a) or the `git worktree add` sequence (Step 2b), as `git -C "$ROOT" status --porcelain`.
+- **Already in a worktree (Step 0):** on arrival at this step, as `git -C "$WORKTREE" status --porcelain`.
 
 **Clean** → proceed (create the worktree if not yet created, then Step 4).
 
@@ -142,6 +146,8 @@ Ready to implement <feature>
 
 When the user chose to proceed past a dirty source, the base line is `Base: <ref> (dirty - proceeded after ask)` instead. When the provenance check fired (fresh paths only), append its `Note: branching from <ref>, not <default>.` line after the base line. `<ref>` per path: fresh creation — the branch/commit the worktree was created from (the user-requested base when one was given); Step 0 — the current branch/HEAD of the existing worktree, with no provenance line.
 
+Every later skill takes `<full-path>` as a value: dispatch `cwd: "<full-path>"`, `git -C <full-path> ...`, or `(cd "<full-path>" && <cmd>)` for other cwd-bound commands. Never change the process cwd.
+
 ## Detached HEAD
 
 If `git symbolic-ref -q HEAD` returns nothing, you're on a detached HEAD. Do not create a worktree from this state — first ask the user whether to branch from the current commit or from `main`.
@@ -151,8 +157,8 @@ If `git symbolic-ref -q HEAD` returns nothing, you're on a detached HEAD. Do not
 For longer-running work the base branch advances:
 
 ```bash
-git fetch origin
-git rebase origin/main    # or merge if branch is shared
+git -C "$WORKTREE" fetch origin
+git -C "$WORKTREE" rebase origin/main    # or merge if branch is shared
 ```
 
 Re-run tests after rebasing.
@@ -161,11 +167,11 @@ Re-run tests after rebasing.
 
 | Situation | Action |
 |---|---|
-| `GIT_DIR != GIT_COMMON` | Already in worktree — do NOT create another |
+| `GIT_DIR != GIT_COMMON` | Already in worktree - report its path, create nothing |
+| Worktree path already listed by `git worktree list` | Report it, create nothing |
 | `git rev-parse --show-superproject-working-tree` returns a path | Submodule — treat as normal repo |
 | Project-native wrapper exists | Use the wrapper (commonly `script/worktree create`) |
 | No native tool | Create `<repo>/.worktrees/<branch>` (gitignore `.worktrees/` first) |
-| No enclosing repo | Fall back to `~/.worktrees/<project>/<branch>` |
 | Detached HEAD | Ask before branching |
 | Sandbox/permission failure | Work in place on a feature branch |
 | Source checkout dirty | Report + ask |
@@ -173,6 +179,7 @@ Re-run tests after rebasing.
 ## Red Flags — STOP
 
 - About to run `git worktree add` from inside a worktree (`GIT_DIR != GIT_COMMON`)
+- About to `cd` into the worktree (carry the path instead)
 - About to call `git worktree add` directly when the project ships a wrapper (use the wrapper)
 - Created a `.worktrees/` worktree without gitignoring `.worktrees/` first
 - Placed a worktree outside `.worktrees/` (or the project's configured path) for no reason

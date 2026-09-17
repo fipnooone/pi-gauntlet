@@ -92,8 +92,8 @@ If the project's `AGENTS.md` calls out additional reading for a specific area (e
 The spec is the **first commit in a dedicated worktree**, not a separate commit on `main`. Before drafting any spec content:
 
 1. Invoke `/skill:using-git-worktrees`. Worktrees live under `.worktrees/` at the repo root, or wherever a project-native worktree script places them.
-2. Switch into the worktree.
-3. From there, write the spec, run self-review, commit, hand off.
+2. Carry the worktree path from the `using-git-worktrees` Step 4 report (`Worktree ready at <full-path>`) as a value: the spec path is `<full-path>/doc/specs/<filename>.md`, every dispatch below sets `cwd: "<full-path>"`, and git runs as `git -C <full-path> ...`. The process cwd stays where pi was launched.
+3. Write the spec at that path, run self-review, commit with `git -C <full-path>`, hand off.
 
 Spec doc, plan doc, and implementation are all developed in the same worktree; the squash ships the spec and the implementation, with the ephemeral plan stripped before landing (see `/skill:finishing-a-development-branch`).
 
@@ -102,6 +102,8 @@ Spec doc, plan doc, and implementation are all developed in the same worktree; t
 ## The Process
 
 ### 1. Check git state
+
+Check git state in the primary checkout (the process cwd; no worktree exists yet):
 
 ```bash
 git status
@@ -271,7 +273,7 @@ The first three checks — **placeholder scan**, **internal consistency**, and *
 - **Otherwise** → dispatch one fresh `worker` that applies the scope + ambiguity checks and fixes them in place:
 
   ```
-  subagent({ agent: "worker", context: "fresh", async: false, cwd: "<abs worktree path, from git rev-parse --show-toplevel>", task:
+  subagent({ agent: "worker", context: "fresh", async: false, cwd: "<abs worktree path, from the using-git-worktrees Step 4 report>", task:
     "Problem statement: <the problem the spec addresses + the user's stated intent>.\n" +
     "Read the spec at <abs path to doc/specs/...>. Edit ONLY that file. Apply two checks and\n" +
     "fix what you find in place: (1) Scope — does every paragraph serve the goal? Cut filler;\n" +
@@ -302,7 +304,7 @@ SUMMARY_PATH=$(mktemp "${TMPDIR:-/tmp}/gauntlet-spec-summary.XXXXXX")   # absolu
 ```
 
 ```
-subagent({ agent: "spec-summarizer", context: "fresh", async: false, cwd: "<abs worktree path, from git rev-parse --show-toplevel>",
+subagent({ agent: "spec-summarizer", context: "fresh", async: false, cwd: "<abs worktree path, from the using-git-worktrees Step 4 report>",
   output: "<SUMMARY_PATH>", outputMode: "file-only", task:
   "Summarize the spec at <abs path to doc/specs/...> for the user review gate. Read ONLY that file." })
 ```
@@ -354,7 +356,7 @@ phase_tracker({ action: "complete", phase: "brainstorm" })
 
 Execute this section in place from any later phase. Do not invoke `/skill:brainstorming` (its entry resets both trackers). Worktree, spec commits, and plan survive.
 
-1. Edit the spec. Show `git --no-pager diff -- <spec path>` and one line of impact (affected plan tasks / waves, or "no plan yet").
+1. Edit the spec. Show `git -C <abs worktree path> --no-pager diff -- <spec path>` and one line of impact (affected plan tasks / waves, or "no plan yet").
 2. Wait for approval. Change request -> revise, re-show.
 3. No plan yet -> commit the spec; continue. Plan exists -> update affected anchors and tasks: `plan_tracker` `add` for new tasks; anchor-changed completed tasks are reopened as `in_progress` and re-run the task loop (`update` never sets `pending`). A removed task is deleted from the plan; then re-`init` the tracker with `{ name, status }` elements: preserved tasks keep their order and statuses, reopened tasks are `in_progress` in place, every still-`pending` task (including newly added ones, whatever wave label they carry) trails the non-pending ones, removed tasks are the only deletions (the only permitted `init` after handoff; never `clear`). Re-run `plan_check` until it passes, commit spec + plan together; continue. A task reopened while `verify` or `ship` is in progress: `phase_tracker({ action: "skip", phase: "<current>", reason: "amendment reopened Task N" })`, then `phase_tracker({ action: "start", phase: "implement", force: true })`; later phases re-enter with `force: true` and rerun in full.
 

@@ -20,13 +20,15 @@
 
   type Handler = (event: any, ctx: any) => unknown;
 
-  function harness(o: { branch?: unknown[]; enabled?: boolean; gitFail?: (args: string[]) => GitResult | undefined; cwdSub?: string; sessionId?: string; model?: { provider: string; id: string }; thinkingLevel?: string; contextTokens?: number | null; telemetryWarning?: string; telemetryDir?: string } = {}) {
+  function harness(o: { branch?: unknown[]; enabled?: boolean; gitFail?: (args: string[], cwd: string) => GitResult | undefined; cwdSub?: string; sessionId?: string; model?: { provider: string; id: string }; thinkingLevel?: string; contextTokens?: number | null; telemetryWarning?: string; telemetryDir?: string } = {}) {
     const root = mkdtempSync(join(tmpdir(), "telemetry-test-"));
     tempDirs.push(root);
     mkdirSync(join(root, "doc/specs"), { recursive: true });
     mkdirSync(join(root, "doc/plans"), { recursive: true });
+    mkdirSync(join(root, ".worktrees/x/doc/specs"), { recursive: true });
     const handlers = new Map<string, Handler[]>();
     const gitCalls: string[][] = [];
+    const gitCwds: string[] = [];
     const readFileCalls: string[] = [];
     let clock = Date.parse("2026-09-17T10:00:00Z");
     const deps: Deps = {
@@ -34,11 +36,15 @@
       now: () => new Date((clock += 1000)).toISOString().replace(/\.\d{3}Z$/, "Z"),
       git: async (args, cwd) => {
         gitCalls.push(args);
-        const forced = o.gitFail?.(args);
+        gitCwds.push(cwd);
+        const forced = o.gitFail?.(args, cwd);
         if (forced) return forced;
-        if (args[0] === "rev-parse" && args.includes("--show-toplevel")) {
-          const toplevel = o.cwdSub && cwd === join(root, o.cwdSub) ? root : cwd;
-          return { code: 0, stdout: toplevel + "\n", stderr: "" };
+        if (args[0] === "rev-parse" && args.includes("--path-format=absolute")) {
+          const wt = /^(.*\/\.worktrees\/[^/]+)(\/|$)/.exec(cwd)?.[1];
+          const primary = cwd === root || cwd.startsWith(root + "/") ? root : cwd.replace(/\/(?:doc|\.pi)(?:\/.*)?$/, "");
+          const toplevel = wt ?? primary;
+          const gitDir = wt ? `${primary}/.git/worktrees/${wt.split("/").pop()}` : `${primary}/.git`;
+          return { code: 0, stdout: `${toplevel}\n${gitDir}\n${primary}/.git\n`, stderr: "" };
         }
         if (args[0] === "rev-parse" && args.includes("--abbrev-ref")) return { code: 0, stdout: "gh-33\n", stderr: "" };
         if (args[0] === "config") return { code: 0, stdout: (args[1] === "user.name" ? "Tester" : "t@example.com") + "\n", stderr: "" };
@@ -71,7 +77,7 @@
       await emit("tool_call", { toolName: "write", toolCallId: "w", input: { path: rel, content: body } });
       return emit("tool_result", { toolName: "write", toolCallId: "w", input: { path: rel, content: body }, content: [], isError: false, details: undefined });
     };
-    return { root, handlers, emit, gitCalls, readFileCalls, commits, recordPath, readRecord, phaseResult, writeSpec, setBranch: (b: unknown[]) => (branch = b), ctx };
+    return { root, handlers, emit, gitCalls, gitCwds, readFileCalls, commits, recordPath, readRecord, phaseResult, writeSpec, setBranch: (b: unknown[]) => (branch = b), ctx };
   }
 
   const P = (over: Record<string, string> = {}) => Object.fromEntries(["brainstorm", "plan", "implement", "verify", "ship"].map((p) => [p, { status: over[p] ?? "pending" }]));
@@ -265,12 +271,47 @@
     fail = false;
     await h.phaseResult("complete", P({ brainstorm: "complete" }));
     assert.equal(h.commits().length, 2);
-    const nogit = harness({ gitFail: (args) => (args[0] === "rev-parse" ? { code: 128, stdout: "", stderr: "fatal: not a git repository" } : undefined) });
+    const outside = mkdtempSync(join(tmpdir(), "telemetry-outside-"));
+    tempDirs.push(outside);
+    const outsideSpec = join(outside, "doc/specs/outside.md");
+    const nogit = harness({ gitFail: (args, cwd) => (args[0] === "rev-parse" && cwd.startsWith(outside) ? { code: 128, stdout: "", stderr: "fatal: not a git repository" } : undefined) });
     await nogit.phaseResult("start", P({ brainstorm: "in_progress" }));
+    await nogit.emit("tool_result", { toolName: "write", toolCallId: "outside", input: { path: outsideSpec }, content: [], isError: false, details: undefined });
     await nogit.writeSpec("doc/specs/a.md");
-    rec = nogit.readRecord();
-    assert.equal(nogit.commits().length, 0);
-    assert.equal(rec.events.filter((e) => e.kind === "warning").length, 1);
+    assert.deepEqual(nogit.readRecord().events.filter((e) => e.kind === "warning").map((e: any) => e.message), [`spec ${outsideSpec} is outside a git checkout; telemetry not recorded`]);
+  });
+
+  test("worktree spec from a primary cwd: record keyed under the worktree, committed there (AC 8)", async () => {
+    const h = harness();
+    await h.emit("session_start", { type: "session_start", reason: "startup" });
+    await h.phaseResult("start", P({ brainstorm: "in_progress" }));
+    await h.writeSpec(".worktrees/x/doc/specs/a.md");
+    const wt = join(h.root, ".worktrees/x");
+    assert.ok(existsSync(join(wt, ".pi/gauntlet/telemetry/doc/specs/a.yaml")), "record lives under the worktree toplevel");
+    assert.equal(existsSync(join(h.root, ".pi/gauntlet")), false, "nothing written under the primary checkout");
+    assert.ok(h.gitCwds.every((c) => c === wt || c.startsWith(wt + "/")), "no git call runs in the primary");
+    const commitIdx = h.gitCalls.findIndex((a) => a[0] === "commit");
+    assert.ok(commitIdx >= 0);
+    assert.equal(h.gitCwds[commitIdx], wt);
+    assert.deepEqual(h.gitCalls[commitIdx].slice(-1), [".pi/gauntlet/telemetry/doc/specs/a.yaml"]);
+  });
+
+  test("a spec in another checkout is a fresh bind, never a git mv", async () => {
+    for (const tool of ["write", "edit"] as const) {
+      const h = harness();
+      await h.phaseResult("start", P({ brainstorm: "in_progress" }));
+      await h.writeSpec(".worktrees/x/doc/specs/a.md", "# CONTEXT DRAFT - NOT A SPEC - fully replaced at spec-writing\n");
+      if (tool === "write") {
+        await h.writeSpec("doc/specs/a.md");
+      } else {
+        writeFileSync(join(h.root, "doc/specs/a.md"), "# Spec\n");
+        await h.emit("tool_result", { toolName: "edit", toolCallId: "e", input: { path: "doc/specs/a.md", oldText: "# Old\n", newText: "# Spec\n" }, content: [], isError: false, details: undefined });
+      }
+      assert.ok(existsSync(h.recordPath("doc/specs/a.md")), `primary record created for ${tool}`);
+      assert.ok(existsSync(join(h.root, ".worktrees/x/.pi/gauntlet/telemetry/doc/specs/a.yaml")), `worktree record left in place for ${tool}`);
+      assert.equal(h.gitCalls.some((a) => a[0] === "mv"), false);
+      assert.equal(h.readRecord("doc/specs/a.md").events.some((e) => e.kind === "spec_renamed"), false);
+    }
   });
 
   test("second session rehydrates all derived accumulators with exactly total and live blocks", async () => {

@@ -1,7 +1,8 @@
 /**
  * Verify-before-ship extension
  *
- * Single-session verification gate for shipping commands (git push / gh pr create).
+ * Single-session verification gate for statement-start shipping commands: git merge
+ * --squash, git push, and gh pr create (with any git global flags).
  * Local commits are not ship events; commit-time review-cadence advisories live in
  * phase-tracker. Tracks whether a recognised verification command has succeeded
  * since the last source-file write; injects an advisory warning into the tool
@@ -32,8 +33,7 @@ import {
   settingsErrorWarning,
 } from "./lib/gauntlet-settings.ts";
 import { loadGauntletSettings } from "./lib/gauntlet-settings-loader.ts";
-
-const SHIP_CMD = /\b(git\s+push|gh\s+pr\s+create)\b/;
+import { matchShipStatement } from "./lib/telemetry-paths.ts";
 
 const SOURCE_EXT = /\.(ts|tsx|js|jsx|py|rb|go|rs|java|swift|kt)$/;
 const TEST_PATH = /(^|\/)(tests?|__tests__)\/|\.(test|spec)\.|_test\.(py|go|rb)$/;
@@ -101,7 +101,7 @@ export default function (pi: ExtensionAPI) {
       return undefined;
     }
 
-    if (SHIP_CMD.test(command) && !verified) {
+    if (matchShipStatement(command) && !verified) {
       if (settingsWarned && !settingsErrShown) {
         addShipWarning(event.toolCallId, settingsWarned);
         settingsErrShown = true;

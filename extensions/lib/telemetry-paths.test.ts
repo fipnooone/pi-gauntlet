@@ -57,6 +57,16 @@ test("matchDiscardStatement matches worktree remove and branch -D", () => {
   assert.equal(matchDiscardStatement("git branch -d gh-33"), undefined);
 });
 
+test("matchShipStatement/matchDiscardStatement accept git -C <path> global flags", () => {
+  assert.deepEqual(matchShipStatement("git -C /p merge --squash f"), { option: "squash", statement: "git -C /p merge --squash f" });
+  assert.equal(matchShipStatement("git -C /p push -u origin HEAD")?.option, "pr");
+  assert.equal(matchShipStatement("git -c user.name=t -C /p merge --squash f")?.option, "squash");
+  assert.equal(matchShipStatement("git -C /p log"), undefined);
+  assert.equal(matchDiscardStatement("git -C /p worktree remove x"), "git -C /p worktree remove x");
+  assert.equal(matchDiscardStatement("git -C /p branch -D f"), "git -C /p branch -D f");
+  assert.equal(matchDiscardStatement("git -C /p branch -d f"), undefined);
+});
+
 test("matchTestStatement returns the first statement matching a test fragment", () => {
   assert.equal(matchTestStatement("cd repo && npm test -- --grep x", DEFAULT_TEST_COMMANDS), "npm test -- --grep x");
   assert.equal(matchTestStatement("make test-smoke", DEFAULT_TEST_COMMANDS), undefined);

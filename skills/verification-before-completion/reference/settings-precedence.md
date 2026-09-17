@@ -40,16 +40,18 @@ Do **not** read or merge these files by hand. Resolution is centralized:
   report - never fall back to a manual bash/JSON merge (that fallback is exactly
   the failure mode this centralization removes).
 - **Extensions** call `loadGauntletSettings(ctx.cwd)` from
-  `extensions/lib/gauntlet-settings-loader.ts`, then the matching resolver in
+  `extensions/lib/gauntlet-settings-loader.ts`, which returns `{ gauntlet, errors, root }`
+  with `root` set to that toplevel, then call the matching resolver in
   `extensions/lib/gauntlet-settings.ts`.
 
 Both paths go through pi's own `SettingsManager`, so they resolve the same merged
 value. The `phase-tracker.ts` closure guard reads via `loadGauntletSettings` +
 `resolveClosureReview`, resolving the same value the tool returns.
 
-## Scope: launch directory
+## Scope: the session cwd's checkout
 
-The tool and loader read relative to pi's session/launch directory (`ctx.cwd`, the
-primary checkout), not a mid-session worktree. A per-branch `.pi/settings.json`
-that diverges from the launch checkout is not resolved and is an unsupported
-workflow - keep `piGauntlet` settings at the repo root or in the preset.
+The tool and loader resolve the repo layer from the git toplevel of pi's session cwd
+(`ctx.cwd`): launched in the primary checkout or any of its subdirectories, that is
+`<primary>/.pi/settings.json`; launched inside a linked worktree, that worktree's own
+file. One checkout, one file - a worktree's `.pi/settings.json` is not consulted when
+pi runs in the primary.

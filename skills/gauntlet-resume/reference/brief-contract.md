@@ -2,7 +2,7 @@
 
 Consumed only by `SKILL.md` in this directory. This file is the single concentration
 point for text coupled to pi-cohort's `/handoff` template (`doc/handoff-template.md`
-in pi-cohort; baseline inlined from its `prune-prompts` branch, commit `d737eb9`).
+in pi-cohort; baseline inlined from its `prune-prompts` branch, commit `812de45`).
 Cohort drift is reconciled here and nowhere else.
 
 ## Brief grammar

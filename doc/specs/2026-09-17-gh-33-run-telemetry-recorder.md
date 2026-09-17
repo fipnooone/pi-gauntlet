@@ -1,5 +1,7 @@
 # Run telemetry recorder (#33)
 
+> **Superseded by:** [doc/specs/2026-09-17-gh-37-worktree-by-path.md](./2026-09-17-gh-37-worktree-by-path.md) - session-toplevel binding and record commit checkout only
+
 **Goal:** A pi extension that mechanically records one committed YAML telemetry record per gauntlet run, keyed by spec path, without any skill-body edits - and hosts one narrow hard guard against re-brainstorming into a shipped spec.
 
 Ticket: GitHub #33. Consumers: #34 (reads `modified_files`, `shipped_at`, `status` at query time), #35 (aggregates records; its "run ID" is the spec path - see Decisions).

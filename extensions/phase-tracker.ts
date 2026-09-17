@@ -9,7 +9,6 @@
  * Use phase_tracker for "what stage am I in?", plan_tracker for "which task?".
  */
 
-import { execSync } from "node:child_process";
 import { existsSync, globSync, readdirSync, readFileSync, readFileSync as readFileBytes } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
@@ -25,6 +24,7 @@ import {
   settingsErrorWarning,
 } from "./lib/gauntlet-settings.ts";
 import { loadGauntletSettings } from "./lib/gauntlet-settings-loader.ts";
+import { checkoutOf, gitSync } from "./lib/checkout.ts";
 import { checkPlan, sha256, type FsPort, type PlanCheckFinding } from "./lib/plan-check.ts";
 import {
   checkSubstep,
@@ -34,6 +34,7 @@ import {
   implementWriteGuardApplies,
   markerBlockReason,
   nextGauntletEntered,
+  parseGitCommand,
   parseGitCommit,
   phaseLabel,
   recoverableEdge,
@@ -159,8 +160,8 @@ const GUARD_PHASES: Phase[] = ["brainstorm", "plan", "implement"];
 // Guard 2 — branch ops in place. `git switch` never targets a file path;
 // `git checkout -b/-B` is explicit branch creation. Bare `git checkout <x>`
 // is excluded (ambiguous with file checkout). `git worktree ...` is exempt.
-const BRANCH_SWITCH = new RegExp(STMT_START + "git\\s+switch\\b");
-const BRANCH_CHECKOUT = new RegExp(STMT_START + "git\\s+checkout\\s+-[bB]\\b");
+const SWITCH_SUB = /switch(?=\s|$)/;
+const CHECKOUT_BRANCH_SUB = /checkout\s+-[bB](?=\s|$)/;
 const GIT_WORKTREE = /\bgit\s+worktree\b/;
 
 // Guard 3 — bash mutation forms during brainstorm.
@@ -394,21 +395,6 @@ export default function (pi: ExtensionAPI) {
   // implementer's first write would trip a spurious advisory.
   const isSubagentChild = Number(process.env.PI_SUBAGENT_DEPTH ?? "0") > 0;
 
-  const inPrimaryCheckout = (() => {
-    try {
-      const lines = execSync("git rev-parse --git-dir --git-common-dir", {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-        timeout: 5000,
-      })
-        .trim()
-        .split("\n");
-      return lines.length === 2 && lines[0] === lines[1];
-    } catch {
-      return false;
-    }
-  })();
-
   // Auto-complete the implement phase from plan_tracker once every task is done,
   // but only when a skill has explicitly started it (TDD, or the SDD
   // execution preamble). The tracker never *fabricates* implement from task activity:
@@ -630,15 +616,16 @@ export default function (pi: ExtensionAPI) {
 
     const warnings: string[] = [];
 
-    // Guard 2 — branch op in place (primary checkout only, brainstorm/plan/implement).
+    // Guard 2 - branch op in the primary checkout (brainstorm/plan/implement). The target
+    // is the command's own -C / leading-cd dir, else the session cwd; a linked worktree
+    // target passes, an unresolvable one passes (the guard protects the primary only).
     const gphase = activeGuardPhase();
-    if (
-      inPrimaryCheckout &&
-      gphase &&
-      !GIT_WORKTREE.test(command) &&
-      (BRANCH_SWITCH.test(command) || BRANCH_CHECKOUT.test(command))
-    ) {
-      return { block: true, reason: branchBlockReason(gphase) };
+    if (gphase && !GIT_WORKTREE.test(command)) {
+      const form = parseGitCommand(command, SWITCH_SUB) ?? parseGitCommand(command, CHECKOUT_BRANCH_SUB);
+      if (form) {
+        const target = resolveRepoDir(form, ctx.cwd);
+        if ((await checkoutOf(target, gitSync))?.isPrimary === true) return { block: true, reason: branchBlockReason(gphase) };
+      }
     }
 
     // Marker commit guard — the context draft (brainstorming gather step) must be
@@ -805,6 +792,10 @@ export default function (pi: ExtensionAPI) {
         } catch {
           return fail([{ check: "input", line: 0, text: "", reason: `plan file unreadable at ${planAbs}` }], planAbs);
         }
+        const root = (await checkoutOf(planAbs, gitSync))?.toplevel;
+        if (!root) {
+          return fail([{ check: "input", line: 0, text: "", reason: "plan is not inside a git checkout" }], planAbs);
+        }
         const planText = planBytes.toString("utf8");
         const planLines = planText.split("\n");
         const planSeparatorIdx = planLines.findIndex((l) => l.trim() === "---");
@@ -820,7 +811,7 @@ export default function (pi: ExtensionAPI) {
             planAbs,
           );
         }
-        const specAbs = isAbsolute(specPathRaw) ? specPathRaw : resolve(ctx.cwd, specPathRaw);
+        const specAbs = isAbsolute(specPathRaw) ? specPathRaw : resolve(root, specPathRaw);
         let specBytes: Buffer;
         try {
           specBytes = readFileBytes(specAbs);
@@ -829,8 +820,8 @@ export default function (pi: ExtensionAPI) {
         }
         const specText = specBytes.toString("utf8");
         const port: FsPort = {
-          exists: (p) => existsSync(resolve(ctx.cwd, p)),
-          glob: (pattern) => globSync(pattern, { cwd: ctx.cwd }),
+          exists: (p) => existsSync(resolve(root, p)),
+          glob: (pattern) => globSync(pattern, { cwd: root }),
         };
         const findings = checkPlan(planText, specText, port);
         if (findings.length > 0) return fail(findings, planAbs);

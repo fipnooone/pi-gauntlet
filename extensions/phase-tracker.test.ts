@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
@@ -24,6 +25,18 @@ const tempCwd = (settings?: unknown) => {
     writeFileSync(join(dir, ".pi", "settings.json"), JSON.stringify(settings));
   }
   return dir;
+};
+
+// Primary checkout with one linked worktree at .worktrees/x. Real git: plan_check and Guard 2
+// resolve checkouts with gitSync, and macOS temp paths need realpath to compare toplevels.
+const gitPrimary = () => {
+  const primary = realpathSync(tempCwd());
+  const git = (...args: string[]) => execFileSync("git", ["-C", primary, ...args], { stdio: "pipe" });
+  git("init", "-q");
+  git("-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "init");
+  mkdirSync(join(primary, "doc"));
+  git("worktree", "add", "-q", join(primary, ".worktrees", "x"), "-b", "x");
+  return { primary, worktree: join(primary, ".worktrees", "x") };
 };
 
 const PHASES = ["brainstorm", "plan", "implement", "verify", "ship"] as const;
@@ -720,7 +733,7 @@ const FIXTURE_SPEC = [
 
 const FIXTURE_PLAN = `# Fixture Plan
 
-**Spec:** \`spec.md\`
+**Spec:** \`doc/specs/spec.md\`
 
 **Verification:** npm test
 
@@ -772,8 +785,10 @@ function writePlanFixture(
 ) {
   const planText = opts.mutatePlan ? opts.mutatePlan(FIXTURE_PLAN) : FIXTURE_PLAN;
   const specText = opts.mutateSpec ? opts.mutateSpec(FIXTURE_SPEC) : FIXTURE_SPEC;
-  const planPath = join(dir, "plan.md");
-  const specPath = join(dir, "spec.md");
+  const planPath = join(dir, "doc/plans/plan.md");
+  const specPath = join(dir, "doc/specs/spec.md");
+  mkdirSync(join(dir, "doc/plans"), { recursive: true });
+  mkdirSync(join(dir, "doc/specs"), { recursive: true });
   writeFileSync(planPath, planText);
   writeFileSync(specPath, specText);
   writeFileSync(join(dir, "file-a.ts"), "// a\n");
@@ -793,8 +808,45 @@ test("plan_check is registered", () => {
   assert.ok(h.tools.some((t) => t.name === "plan_check"));
 });
 
-test("plan_check pass: text, details, and stamp arming when a flow is entered", async () => {
+test("plan_check roots at the plan's checkout: worktree plan passes from <primary>/doc (AC 1)", async () => {
+  const { primary, worktree } = gitPrimary();
+  const { planPath } = writePlanFixture(worktree);
+  const h = harness({ cwd: join(primary, "doc") });
+  await h.emit("session_start");
+  const tool = h.tools.find((t) => t.name === "plan_check")!;
+  const res = (await tool.execute("t1", { planPath }, undefined, undefined, h.ctx)) as { content: { text: string }[]; details: { status: string; specPath: string } };
+  assert.match(res.content[0].text, /^PASS/);
+  assert.equal(res.details.specPath, join(worktree, "doc/specs/spec.md"));
+});
+
+test("plan_check outside any checkout: input finding", async () => {
   const dir = tempCwd();
+  const { planPath } = writePlanFixture(dir);
+  const h = harness({ cwd: dir });
+  await h.emit("session_start");
+  const tool = h.tools.find((t) => t.name === "plan_check")!;
+  const res = (await tool.execute("t1", { planPath }, undefined, undefined, h.ctx)) as { content: { text: string }[]; details: { status: string } };
+  assert.equal(res.details.status, "fail");
+  assert.match(res.content[0].text, /input @ line 0: plan is not inside a git checkout/);
+});
+
+const bashCall = (id: string, command: string) => ({ toolName: "bash", toolCallId: id, input: { command } });
+const blocked = (results: unknown[]) => (results[0] as { block?: boolean } | undefined)?.block === true;
+
+test("Guard 2 evaluates the command's target checkout (AC 3)", async () => {
+  const { primary, worktree } = gitPrimary();
+  const h = harness({ cwd: join(primary, "doc"), branch: [phaseResult("start", phases({ brainstorm: "in_progress" }))] });
+  await h.emit("session_start");
+  assert.ok(blocked(await h.emitEvent("tool_call", bashCall("b1", "git switch -c y"))), "bare switch from <primary>/doc blocks");
+  assert.ok(blocked(await h.emitEvent("tool_call", bashCall("b2", `git -C ${primary} switch -c y`))), "-C <primary> blocks");
+  assert.ok(!blocked(await h.emitEvent("tool_call", bashCall("b3", `git -C ${worktree} switch -c y`))), "-C <worktree> passes");
+  assert.ok(!blocked(await h.emitEvent("tool_call", bashCall("b4", `cd ${worktree} && git checkout -b y`))), "cd <worktree> passes");
+  assert.ok(!blocked(await h.emitEvent("tool_call", bashCall("b5", "git -C /nonexistent/dir switch -c y"))), "unresolvable target passes");
+  assert.ok(!blocked(await h.emitEvent("tool_call", bashCall("b6", "git worktree add .worktrees/y -b y"))), "git worktree is exempt");
+});
+
+test("plan_check pass: text, details, and stamp arming when a flow is entered", async () => {
+  const dir = gitPrimary().primary;
   const { planPath, specPath, planText, specText } = writePlanFixture(dir);
   const h = harness({ cwd: dir, branch: readyForImplementBranch });
   await h.emit("session_start");
@@ -824,7 +876,7 @@ test("plan_check pass: text, details, and stamp arming when a flow is entered", 
 });
 
 test("plan_check pass outside a flow: no stamp, plain-linter text", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath } = writePlanFixture(dir);
   const h = harness({ cwd: dir });
   await h.emit("session_start");
@@ -834,7 +886,7 @@ test("plan_check pass outside a flow: no stamp, plain-linter text", async () => 
 });
 
 test("plan_check fail: mutated plan body, no error key, clears stamp", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath } = writePlanFixture(dir, {
     mutatePlan: (t) => t.replace("implements helperFn() for parsing.", "implements the helper for parsing."),
   });
@@ -857,9 +909,9 @@ test("plan_check fail: mutated plan body, no error key, clears stamp", async () 
 });
 
 test("plan_check fail: unresolvable spec path", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath } = writePlanFixture(dir, {
-    mutatePlan: (t) => t.replace("**Spec:** `spec.md`", "**Spec:** `missing-spec.md`"),
+    mutatePlan: (t) => t.replace("**Spec:** `doc/specs/spec.md`", "**Spec:** `missing-spec.md`"),
   });
   const h = harness({ cwd: dir, branch: readyForImplementBranch });
   await h.emit("session_start");
@@ -881,11 +933,11 @@ test("plan_check fail: unresolvable spec path", async () => {
 });
 
 test("plan_check fail: header **Spec:** extraction is confined to the header (a path-only-looking line below the separator does not count)", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath } = writePlanFixture(dir, {
     mutatePlan: (t) =>
       t
-        .replace("**Spec:** `spec.md`\n\n", "")
+        .replace("**Spec:** `doc/specs/spec.md`\n\n", "")
         .replace(
           "## Wave 1 - Two parallel tasks",
           "## Wave 1 - Two parallel tasks\n\n**Spec:** `not-the-header-spec.md`\n",
@@ -907,9 +959,9 @@ test("plan_check fail: header **Spec:** extraction is confined to the header (a 
 });
 
 test("plan_check fail: plan header has no path-only **Spec:** line at all", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath } = writePlanFixture(dir, {
-    mutatePlan: (t) => t.replace("**Spec:** `spec.md`\n\n", ""),
+    mutatePlan: (t) => t.replace("**Spec:** `doc/specs/spec.md`\n\n", ""),
   });
   const h = harness({ cwd: dir, branch: readyForImplementBranch });
   await h.emit("session_start");
@@ -942,7 +994,7 @@ test("implement-start gate: rejects with no stamp, names plan_check remedy", asy
 });
 
 test("implement-start gate: stale plan bytes rejected, names the stale file", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath } = writePlanFixture(dir);
   const h = harness({ cwd: dir, branch: readyForImplementBranch });
   await h.emit("session_start");
@@ -958,7 +1010,7 @@ test("implement-start gate: stale plan bytes rejected, names the stale file", as
 });
 
 test("implement-start gate: stale spec bytes rejected, names the stale file", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath, specPath } = writePlanFixture(dir);
   const h = harness({ cwd: dir, branch: readyForImplementBranch });
   await h.emit("session_start");
@@ -974,7 +1026,7 @@ test("implement-start gate: stale spec bytes rejected, names the stale file", as
 });
 
 test("implement-start gate: missing stamped file rejected, names the missing path", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath } = writePlanFixture(dir);
   const h = harness({ cwd: dir, branch: readyForImplementBranch });
   await h.emit("session_start");
@@ -1002,7 +1054,7 @@ test("implement-start gate: enforce false skips the gate entirely", async () => 
 });
 
 test("replay: a passing plan_check result restores the stamp without re-running the tool", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath, specPath } = writePlanFixture(dir);
   const passDetails = {
     status: "pass",
@@ -1022,7 +1074,7 @@ test("replay: a passing plan_check result restores the stamp without re-running 
 });
 
 test("replay: pass then fail clears the stamp", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath, specPath } = writePlanFixture(dir);
   const passDetails = {
     status: "pass",
@@ -1045,7 +1097,7 @@ test("replay: pass then fail clears the stamp", async () => {
 });
 
 test("replay: a plan_check pass observed before any flow entry does not arm the stamp, and a live walk with no live plan_check is rejected", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath, specPath } = writePlanFixture(dir);
   const passDetails = {
     status: "pass",
@@ -1070,7 +1122,7 @@ test("replay: a plan_check pass observed before any flow entry does not arm the 
 });
 
 test("replay: a phase_tracker reset clears the stamp", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath, specPath } = writePlanFixture(dir);
   const passDetails = {
     status: "pass",
@@ -1097,7 +1149,7 @@ test("replay: a phase_tracker reset clears the stamp", async () => {
 });
 
 test("replay via session_fork: a passing plan_check result restores the stamp without re-running the tool", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath, specPath } = writePlanFixture(dir);
   const passDetails = {
     status: "pass",
@@ -1124,7 +1176,7 @@ test("replay via session_fork: a passing plan_check result restores the stamp wi
 });
 
 test("replay via session_tree: a passing plan_check result restores the stamp without re-running the tool", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath, specPath } = writePlanFixture(dir);
   const passDetails = {
     status: "pass",
@@ -1152,7 +1204,7 @@ test("replay via session_tree: a passing plan_check result restores the stamp wi
 });
 
 test("replay via session_switch: pass then fail clears the stamp, rebuilt from replay rather than a live run", async () => {
-  const dir = tempCwd();
+  const dir = gitPrimary().primary;
   const { planPath, specPath } = writePlanFixture(dir);
   const passDetails = {
     status: "pass",

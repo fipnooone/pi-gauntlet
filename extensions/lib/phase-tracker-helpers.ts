@@ -37,18 +37,15 @@ export function phaseLabel(name: string, substep?: string): string {
 // Same statement-start anchor as the branch guards in phase-tracker.ts. Exported
 // so Wave 2 wiring in phase-tracker.ts can drop its duplicate copy.
 export const STMT_START = "(?:^|[\\n;&|(])\\s*";
-// `git commit`, tolerating any global flags between `git` and `commit` (e.g.
-// `-c user.email=x`, common in CI per-commit identity). Group 1 captures the
-// whole flags span as ONE opaque block rather than -C directly: nesting a
-// capture inside a repeated alternation resets it to undefined on iterations
-// that take the other branch (JS regex semantics), so -C after a later flag
-// (e.g. `-C /wt -c user.email=x commit`) would silently lose its capture.
-// DASH_C below re-extracts -C from that span once, outside any repetition.
-// `commit` must be followed by whitespace or end-of-string, not just a word
-// boundary, so `commit-graph` / `commit-tree` don't false-positive.
-const GIT_COMMIT = new RegExp(
-  STMT_START + "git\\s+((?:-\\S+(?:\\s+\\S+)?\\s+)*)commit(?=\\s|$)",
-);
+// `git <global flags> <subcommand>`, tolerating any global flags between `git` and the
+// subcommand (e.g. `-C /wt`, `-c user.email=x`). Group 1 captures the whole flags span as
+// ONE opaque block rather than -C directly: nesting a capture inside a repeated alternation
+// resets it to undefined on iterations that take the other branch (JS regex semantics).
+// DASH_C re-extracts -C from that span once, outside any repetition. Callers pass a
+// subcommand regex that ends in `(?=\s|$)` so `commit-graph` / `switcheroo` don't match.
+const GIT_FLAGS_SPAN = "git\\s+((?:-\\S+(?:\\s+\\S+)?\\s+)*)";
+const gitCommandRe = (subcommand: RegExp): RegExp => new RegExp(STMT_START + GIT_FLAGS_SPAN + "(?:" + subcommand.source + ")");
+const GIT_COMMIT_SUB = /commit(?=\s|$)/;
 const DASH_C = /(?:^|\s)-C\s+(\S+)/;
 // Global, lookaround-delimited (not consuming) so adjacent `cd a && cd b &&`
 // statements don't eat each other's anchor/`&&` and hide the second match.
@@ -61,11 +58,11 @@ export interface CommitForm {
   cdPath: string | undefined;
 }
 
-// Textual match anchored at statement starts (^ ; & | ( or newline). Quoted text
-// can still match when preceded by such a char (e.g. sh -c 'x; git commit') —
-// accepted heuristic, same tolerance as the existing Guard 3 mutation checks.
-export function parseGitCommit(command: string): CommitForm | undefined {
-  const m = GIT_COMMIT.exec(command);
+// Textual match anchored at statement starts (^ ; & | ( or newline). Quoted text can
+// still match when preceded by such a char (e.g. sh -c 'x; git commit') - accepted
+// heuristic, same tolerance as the existing Guard 3 mutation checks.
+export function parseGitCommand(command: string, subcommand: RegExp): CommitForm | undefined {
+  const m = gitCommandRe(subcommand).exec(command);
   if (!m) return undefined;
   let cdPath: string | undefined;
   for (const cd of command.matchAll(LEADING_CD)) {
@@ -73,6 +70,8 @@ export function parseGitCommit(command: string): CommitForm | undefined {
   }
   return { cPath: DASH_C.exec(m[1])?.[1], cdPath };
 }
+
+export const parseGitCommit = (command: string): CommitForm | undefined => parseGitCommand(command, GIT_COMMIT_SUB);
 
 export function resolveRepoDir(form: CommitForm, sessionCwd: string): string {
   const base = form.cdPath ? resolve(sessionCwd, form.cdPath) : sessionCwd;
