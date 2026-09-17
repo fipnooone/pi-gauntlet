@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.8.1 - 2026-09-17
 
 - chase-bug hotfix: the implementer proves its worktree binding first, addresses every mutating git command with `git -C`, runs with a fresh context, and the parent aborts non-destructively on any primary-checkout drift after each implementer return; `ci.mjs` asserts the guard text ([#36](https://github.com/jjuraszek/pi-gauntlet/issues/36))
 - `gauntlet-resume`: same-repository worktrees resume from a pi session launched in the primary checkout; cross-repository targets still stop, and reconstruction addresses the resolved worktree by path.
