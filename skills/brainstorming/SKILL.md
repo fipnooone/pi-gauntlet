@@ -61,7 +61,8 @@ Work through the items below **in order**. This is your own checklist to follow,
    substep. Unconditional, foreground, no user interaction — the next thing the user
    sees is a questionary question. This produces the draft; the step below consumes it.
 4. **Understand the idea against the draft** — `Read` the draft, verify load-bearing
-   claims against real code, ask questions one at a time, append citable findings
+   claims against real code, ask questions one at a time, append citable findings;
+   then state the chat premise note (section 3) before approaches
 5. **Propose 2-3 approaches** — with trade-offs and a recommendation
 6. **Present the design** — in two rounds, one approval each
 7. **Write the spec** — to `doc/specs/` (see [Filename Convention](#filename-convention)); then mark any known superseded predecessor(s) per [Marking superseded specs](#marking-superseded-specs), at the exact-order position defined in [Spec Self-Review](#spec-self-review-before-user-review-gate)
@@ -143,12 +144,29 @@ path.
   section starts that answer; confirm it before designing from scratch.
 - Ask questions **one at a time** to refine the idea. Prefer multiple-choice; one
   question per message. Focus on: purpose, constraints, success criteria, who/what
-  it touches.
+  it touches. Before asking, check whether the code, the docs, or the issue tracker
+  already answer it - if so, look it up instead of asking (dispatch a subagent when
+  the lookup is costly), and ask only what no source can answer. Every question you
+  ask, including asking the user to accept a corrected fact, ends with the line
+  `Recommendation: <answer> - <why>` - the answer, then " - ", then the reason.
 - **Append bar:** append to the draft's `## Appended during questionary` only
   findings the spec will cite — schema shapes, hard constraints, ticket-vs-code
   contradictions, user answers that changed scope. Not a log of every grep.
   (Appending uses `edit`; the `edit` prohibition in the spec-writing step applies
   only there.)
+
+Before proposing approaches, state the premise note in chat: what the design depends
+on, which of those claims the sources support and where you saw it (a file and line,
+a doc, a ticket), which they disprove - give the corrected fact and where you found
+it - and which remain unverified, naming the lookup you tried. Write it as a note a
+person can act on: full sentences, no status-keyword lists, no template; when the
+design depends on no claims at all, one sentence saying so is enough. An unverified claim is not a stop - it enters the
+spec as an Open Question or a stated assumption. If a claim the design depends on was
+contradicted, the note is your next message and it ends by asking the user to accept
+the corrected fact or explicitly override it; nothing else continues - no other
+questions, no approaches - until they answer, and the outcome is recorded in the draft's
+`## Appended during questionary` so spec-writing carries it into `## Problem` or the relevant `## Design`
+decision.
 
 ### 4. Explore approaches
 
@@ -382,6 +400,7 @@ Redraw: keep the worktree and the approved spec file. `plan_tracker({ action: "c
 - Running, deploying, or validating the proposed change before approval.
 - Proceeding to `/skill:writing-plans` before the user approves the spec, or invoking `/skill:brainstorming` to amend an approved spec.
 - Writing a replacement spec without the known predecessor's banner, or offering a multi-spec split that fails `../shape-ticket/reference/split-axes.md`.
+- Proposing approaches while a contradicted claim is unresolved.
 
 ## Project overrides
 
