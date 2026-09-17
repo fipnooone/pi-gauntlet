@@ -188,6 +188,12 @@ const tokenChecks = [
   ["skills/verification-before-completion/reference/conformance-check.md", "`accept`/`rescope`/`UNAUTHORIZED`", false],
   ["agents/conformance-reviewer.md", "`accept`/`rescope`/`UNAUTHORIZED`", false],
   ["agents/conformance-reviewer.md", "harmless \u2192 `accept`", false],
+  // absent (spec-in-hand resume path and pi-intercom are gone)
+  ["skills/writing-plans/SKILL.md", "spec in hand", false],
+  ["skills/writing-plans/SKILL.md", "Resuming with", false],
+  ["skills/dispatching-parallel-agents/SKILL.md", "intercom", false],
+  ["skills/brainstorming/SKILL.md", "intercom", false],
+  ["doc/configuration.md", "intercom", false],
   // unchanged surface (must still be present)
   ["skills/verification-before-completion/reference/conformance-check.md", "keep `origin: none (scope creep)` verbatim", true],
   ["skills/verification-before-completion/reference/conformance-check.md", "Unavailable: scope creep has no origin requirement to defer", true],

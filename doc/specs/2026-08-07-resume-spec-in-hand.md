@@ -1,5 +1,7 @@
 # Resume with a spec in hand: sanctioned handoff entry + implement-phase write guard
 
+> **Superseded by:** [doc/specs/2026-09-17-gh-31-gauntlet-resume.md](./2026-09-17-gh-31-gauntlet-resume.md) - sanctioned "spec in hand" entry subsection only
+
 Closes [jjuraszek/pi-gauntlet#6](https://github.com/jjuraszek/pi-gauntlet/issues/6). Scope is issue #6 exactly as roasted; the three contradictions raised during design (block vs advisory, gesture form, execution-mode choice) were each resolved in favor of the roasted design and are recorded in Decisions below.
 
 ## Context

@@ -38,7 +38,7 @@ This skill ends with a **written, user-reviewed spec inside a worktree**. Nothin
 
 ## Foreground dispatch policy
 
-Flow-owned execution dispatches run in the foreground: set top-level `async: false` on gather, critique, council, summary, implementation, review, conformance, and retry calls. `forceTopLevelAsync` must remain unset or false; it is incompatible with this flow. See [pi-cohort dispatch configuration](https://github.com/jjuraszek/pi-cohort/blob/main/doc/configuration.md). If a dispatch returns an async handle despite `async: false`, stop and report the configuration error: do not poll it, relaunch work, or advance the flow. An intercom-detached child is likewise incomplete work; use the existing coordination path and never accept or duplicate it.
+Flow-owned execution dispatches run in the foreground: set top-level `async: false` on gather, critique, council, summary, implementation, review, conformance, and retry calls. `forceTopLevelAsync` must remain unset or false; it is incompatible with this flow. See [pi-cohort dispatch configuration](https://github.com/jjuraszek/pi-cohort/blob/main/doc/configuration.md). If a dispatch returns an async handle despite `async: false`, stop and report the configuration error: do not poll it, relaunch work, or advance the flow. A child that detached from the foreground run is likewise incomplete work; use the existing coordination path and never accept or duplicate it.
 
 Foreground does not serialize independent work: preserve existing isolated parallel `tasks` batches and await their terminal results before acceptance or tracker/phase advancement.
 

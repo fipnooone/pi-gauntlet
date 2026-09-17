@@ -206,7 +206,7 @@ subagent({
 })
 ```
 
-For chains, async runs, intercom coordination, and the full agent roster, read the `pi-cohort` skill — this skill covers only the parallel fan-out case.
+For chains, async runs, and the full agent roster, read the `pi-cohort` skill — this skill covers only the parallel fan-out case.
 
 ## Verification
 
