@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.7.0 - 2026-09-17
 
 - `gauntlet-resume` (new, human-only, `disable-model-invocation: true`): the sole re-entry point into an interrupted gauntlet flow from a fresh session. Input is a pi-cohort `/handoff` brief (file or pasted; grammar in `skills/gauntlet-resume/reference/brief-contract.md`) or a bare worktree that already holds a spec (`reference/reconstruction.md`). Restores `phase_tracker` / `plan_tracker` state via `start brainstorm` + `skip` with `resume:` reasons, re-runs `plan_check` before implement-or-later, stops a ship-stage brief at verify, never creates a worktree, never infers approval from artifacts. Free-form prompts redirect to `/skill:brainstorming`.
 - `writing-plans`: "Resuming with a spec in hand" removed; `start plan` is skipped when the phase is already `in_progress` (a `gauntlet-resume` arrival).
