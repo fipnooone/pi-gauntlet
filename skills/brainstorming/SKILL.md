@@ -145,10 +145,12 @@ path.
 - Ask questions **one at a time** to refine the idea. Prefer multiple-choice; one
   question per message. Focus on: purpose, constraints, success criteria, who/what
   it touches. Before asking, check whether the code, the docs, or the issue tracker
-  already answer it - if so, look it up instead of asking (dispatch a subagent when
-  the lookup is costly), and ask only what no source can answer. Every question you
-  ask, including asking the user to accept a corrected fact, ends with the line
-  `Recommendation: <answer> - <why>` - the answer, then " - ", then the reason.
+  already answer it: a fact about the current state is looked up, not asked (dispatch
+  a subagent when the lookup is costly); a decision about what should happen is asked,
+  even when a ticket recorded one earlier. Every questionary question, including the
+  ask to accept a corrected fact, ends with the line `Recommendation: <answer> - <why>`
+  (the answer, then " - ", then the reason); approvals elsewhere in this skill (git
+  state, design rounds, the spec gate) keep their own wording.
 - **Append bar:** append to the draft's `## Appended during questionary` only
   findings the spec will cite — schema shapes, hard constraints, ticket-vs-code
   contradictions, user answers that changed scope. Not a log of every grep.
@@ -160,13 +162,14 @@ on, which of those claims the sources support and where you saw it (a file and l
 a doc, a ticket), which they disprove - give the corrected fact and where you found
 it - and which remain unverified, naming the lookup you tried. Write it as a note a
 person can act on: full sentences, no status-keyword lists, no template; when the
-design depends on no claims at all, one sentence saying so is enough. An unverified claim is not a stop - it enters the
-spec as an Open Question or a stated assumption. If a claim the design depends on was
-contradicted, the note is your next message and it ends by asking the user to accept
-the corrected fact or explicitly override it; nothing else continues - no other
-questions, no approaches - until they answer, and the outcome is recorded in the draft's
-`## Appended during questionary` so spec-writing carries it into `## Problem` or the relevant `## Design`
-decision.
+design depends on no claims at all, one sentence saying so is enough. An unverified
+claim is not a stop - it enters the spec as an Open Question or a stated assumption.
+If a claim the design depends on was contradicted, the note is your next message -
+even as questionary question one - and it ends by asking the user to accept the
+corrected fact or explicitly override it; nothing else continues - no other questions,
+no approaches - until they answer, and the outcome is recorded in the draft's
+`## Appended during questionary` so spec-writing carries it into `## Problem` or the
+relevant `## Design` decision.
 
 ### 4. Explore approaches
 
