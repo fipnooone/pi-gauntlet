@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.12.0 - 2026-09-19
 
 - New human-only `/skill:gauntlet-performance` and parse-only `gauntlet-performance` bin: the CLI digests committed telemetry records (current repo, plus `--dir <path>` repos; `--since <version>` narrows; `--json`) into per-run rows and per-version p50/max, and the skill turns the digest into one example-led recommendation, cornerstones, and a three-item menu (render on request, ticket via `shape-ticket`, drill-down). `gauntlet-telemetry-salvage` now stamps a record still `in_progress` with no ship phase as `status: shipped` + `shipped_at` at landing (`present`/`restored ... (marked shipped)`, `unfinished` under `--check`); `finishing-a-development-branch` and `gatekeep-pr` carry the new lines. The gh-37 record on this repo is backfilled to `shipped`. (#35)
 
