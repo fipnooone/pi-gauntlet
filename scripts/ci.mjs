@@ -180,6 +180,12 @@ const tokenChecks = [
   ["skills/subagent-driven-development/code-quality-reviewer-prompt.md", "`Behaviour-change:` on **every** report", true],
   ["skills/subagent-driven-development/SKILL.md", "never default to `no`", true],
   ["skills/writing-plans/SKILL.md", "is never waivable", true],
+  // council provenance / probe-before-apply / standing amend approval
+  ["agents/spec-council-member.md", "probed:", true],
+  ["agents/spec-council-member.md", "End every finding with `probed:`", true],
+  ["agents/spec-council-synthesizer.md", "grounded|hypothesis:", true],
+  ["skills/roasting-the-spec/SKILL.md", "clusters that assert data shape, ordering, or semantics", true],
+  ["skills/brainstorming/SKILL.md", "waives per-diff review", true],
   // #27 gate removal / amendment path
   ["skills/brainstorming/SKILL.md", "## Amending an approved spec", true],
   ["skills/writing-plans/SKILL.md", "#amending-an-approved-spec", true],

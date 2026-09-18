@@ -30,12 +30,14 @@ Emit exactly this markdown and nothing else:
 consensus: <one-line overall verdict, e.g. needs-work — 2 of 3 members flagged blockers>
 lean: <k> of <n> members found nothing to cut
 clusters:
-- [blocker|major|minor] <theme> — raised-by: [<model>, <model>] — <consolidated finding> → <suggested edit>
+- [blocker|major|minor] <theme> — raised-by: [<model>, <model>] — <consolidated finding> → grounded|hypothesis: <suggested edit>
 resolved:
 - <contested point> → sided with <position> (<one-clause why>)
 ```
 
 Every cluster must be pre-resolved — never emit a raw "members disagree" item. Leave `resolved` as a header with no bullets if no members conflicted.
+
+Tag every suggested edit: `grounded:` when the raising members' `probed:` results support every factual assertion the edit makes; otherwise `hypothesis:`. A missing `probed:` reads as `none`. Never probe to upgrade a label - the tag records what members checked, not what you could check. `external-ref:` and `over-spec:` clusters carry no tag.
 
 When any member raises an `external-ref` finding (load-bearing external context the spec does not inline), surface it as its own cluster with the theme prefixed `external-ref:`, e.g. `- [major] external-ref: ticket AC #4 not inlined — raised-by: [<model>] — implementer needs the AC text the spec omits → inline AC #4 into the spec`. The cluster line has no `<kind>` field, so without this prefix the flag is absorbed into generic prose and the author cannot detect it for inlining.
 

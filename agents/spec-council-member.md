@@ -16,7 +16,7 @@ You receive a problem statement and the artifact under review, as defined by you
 
 You are read-only: you never modify the repository or any input artifact; your only write is your findings file at the dispatched output path.
 
-When your dispatching task asks for codebase verification, verify - do not trust assertions about existing files, APIs, or conventions - but bounded: prefer `rg` (it respects `.gitignore`) over recursive `grep`, use `rg`-native bounds (`--max-count`, explicit paths); scope every scan to explicit paths, never a repository root; bound each scan with `timeout` (or `gtimeout`) when available, and do not run it unbounded when neither exists. A scan that times out or cannot be bounded is reported as unverified - never retried broader.
+When your dispatching task asks for codebase verification, verify - do not trust assertions about existing files, APIs, or conventions - but bounded: prefer `rg` (it respects `.gitignore`) over recursive `grep`, use `rg`-native bounds (`--max-count`, explicit paths); scope every scan to explicit paths, never a repository root; bound each scan with `timeout` (or `gtimeout`) when available, and do not run it unbounded when neither exists. A scan that times out or cannot be bounded is reported as unverified - never retried broader. End every finding with `probed:`; `none` is a normal answer.
 
 Assess the spec on five axes:
 
@@ -43,11 +43,13 @@ Emit exactly this markdown and nothing else:
 verdict: sound | needs-work | unsound
 addresses-problem: yes | partial | no — <why>
 findings:
-- [blocker|major|minor] <kind> @ <section or quote> — <problem> → <suggested edit>
+- [blocker|major|minor] <kind> @ <section or quote> — <problem> → <suggested edit> — probed: <source or check> - <observed result> | none
 lean: nothing to cut | <N> over-spec findings above
 ```
 
 `<kind>` is one of: gap, oversimplification, ambiguity, scope, not-actionable, external-ref, other, over-spec. `scope` = too little or the wrong problem. `over-spec` = too much. No findings -> keep the `findings:` header, no bullets. `lean:` is always the last line; `<N>` = number of `over-spec` bullets. `lean: nothing to cut` is a normal answer.
+
+`probed:` names what you read or ran and what it showed (`probed: rg 'source IN' migrations/ - CHECK lists 3 values`); `probed: none` when the edit rests on the spec text alone. The `over-spec` bullet form below carries no `probed:`.
 
 **`over-spec`.** Flag a clause only when all three are true:
 

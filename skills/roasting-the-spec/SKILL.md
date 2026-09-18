@@ -119,6 +119,8 @@ For each cluster in the chair's report, decide one of:
 - **defer** — out of scope for this spec; name where it belongs. Do not edit the spec.
 - **reject** — one-line reason. Do not edit the spec.
 
+**`hypothesis` clusters that assert data shape, ordering, or semantics** (a parsing rule, a field's meaning, a sort or date order, an identity key) are applied only after a probe. Search once for the artifact: one `rg --max-count` under `timeout` over `<abs worktree path>` and its docs, config, and script directories, for the artifact or for how it is obtained. At hand -> one bounded read-only check: a read, an `rg` over explicit paths, or a project script whose source you read and which only reads local files. Confirmed -> apply as fact. Anything else (not found, inconclusive, timed out, contradicted) -> write the edit into `## Open questions` (create the section if absent) with the probe run, its outcome, the obtain-hint if found, and the settlement path: the user supplies the fact at the gate, or the first plan task that obtains the artifact settles it via brainstorming's [Amending an approved spec](../brainstorming/SKILL.md#amending-an-approved-spec). One Open Question per artifact, listing every edit it settles - never one per assertion. Never fetch, build, or run the proposed change to obtain the artifact. A cluster without a tag is read as `hypothesis`; a `hypothesis` cluster that asserts nothing about data applies as any other.
+
 Also inline any `external-ref:` cluster you have context for (e.g. a ticket fetched during brainstorming) as part of the apply-set — this is your call, same as any other cluster.
 
 An `over-spec:` cluster decided **apply** is executed as deletion or shrink of the quoted clause **and** any acceptance-criteria or testing-approach line that exists only for it. Its audit line reads `Applied: over-spec: <clause> -> cut (was adds: M files / N tests / K ACs)` or `Applied: over-spec: <clause> -> shrunk to <replacement> (was adds: ...)`, so the gate shows what was removed. `defer`/`reject` are unchanged.
@@ -130,7 +132,7 @@ You are the advocate — decide on scope grounds — and, unlike a dispatched su
 Return a structured audit, gate-only (not a committed spec section) — a coverage line plus three labelled lists:
 
 - `Coverage:` — `N of M members reported; <slug>: <reason>` — present only when member coverage was partial; omitted at full coverage.
-- `Applied:` — cluster -> the concrete edit made.
+- `Applied:` — one of `Applied: <cluster> -> <edit> (grounded: <member probe>)`, `Applied: <cluster> -> <edit> (probed: <check> - <result>)` for a confirmed hypothesis, `Applied: <cluster> -> open question (<not found | inconclusive: <check> | contradicted: <result>>)`. The probe rides on the audit line because member files are removed in section 5.
 - `Deferred:` — cluster -> where it belongs.
 - `Rejected:` — cluster -> one-line reason.
 
