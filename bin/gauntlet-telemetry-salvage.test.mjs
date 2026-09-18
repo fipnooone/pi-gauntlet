@@ -49,9 +49,11 @@
   // An empty preset dir by default: the developer's real ~/.pi/agent/settings.json must never leak into fixtures.
   const EMPTY_AGENT = mkdtempSync(join(tmpdir(), "gts-empty-agent-"));
   process.on("exit", () => rmSync(EMPTY_AGENT, { recursive: true, force: true }));
+  // The CLI commits with whatever identity git resolves, like the recorder; CI runners have none.
+  const IDENTITY = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
   const invoke = (args, env = {}, options = {}) => {
     const r = spawnSync(process.execPath, [CLI, ...args], {
-      encoding: "utf8", env: { ...process.env, PI_CODING_AGENT_DIR: EMPTY_AGENT, ...env }, timeout: options.timeout,
+      encoding: "utf8", env: { ...process.env, ...IDENTITY, PI_CODING_AGENT_DIR: EMPTY_AGENT, ...env }, timeout: options.timeout,
     });
     return { status: r.status, stdout: r.stdout.trim(), stderr: r.stderr.trim(), lines: r.stdout.split("\n").filter(Boolean) };
   };
