@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.10.0 - 2026-09-18
 
 - Council provenance: member findings (except `over-spec`) end with `probed: <source or check> - <result> | none`; the chair tags each suggested edit `grounded:` or `hypothesis:` (`external-ref:` and `over-spec:` clusters stay untagged); `roasting-the-spec` probes `hypothesis` data-shape claims once (bounded, read-only, artifact at hand) before applying, else lands them as one grouped Open Question per artifact; `Applied:` audit lines carry the probe.
 - Standing amend approval: a chat instruction that waives per-diff review ("auto-apply amends, stop only for redraws") lets brainstorming's amendment step render the diff and continue; redraws and the spec gate still stop; the grant is quoted in each amendment commit body. Limitation: back-to-back amendments with no user input between them count as one in telemetry `derived.amendments` (coalesced until the next input event).
