@@ -33,7 +33,8 @@
   ],
   "bin": {
     "gauntlet-spec-index": "bin/gauntlet-spec-index.mjs",
-    "gauntlet-telemetry-salvage": "bin/gauntlet-telemetry-salvage.mjs"
+    "gauntlet-telemetry-salvage": "bin/gauntlet-telemetry-salvage.mjs",
+    "gauntlet-performance": "bin/gauntlet-performance.mjs"
   },
   "engines": {
     "node": ">=24.15.0"

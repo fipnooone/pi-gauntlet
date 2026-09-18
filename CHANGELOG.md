@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New human-only `/skill:gauntlet-performance` and parse-only `gauntlet-performance` bin: the CLI digests committed telemetry records (current repo, plus `--dir <path>` repos; `--since <version>` narrows; `--json`) into per-run rows and per-version p50/max, and the skill turns the digest into one example-led recommendation, cornerstones, and a three-item menu (render on request, ticket via `shape-ticket`, drill-down). `gauntlet-telemetry-salvage` now stamps a record still `in_progress` with no ship phase as `status: shipped` + `shipped_at` at landing (`present`/`restored ... (marked shipped)`, `unfinished` under `--check`); `finishing-a-development-branch` and `gatekeep-pr` carry the new lines. The gh-37 record on this repo is backfilled to `shipped`. (#35)
+
 ## v5.11.0 - 2026-09-18
 
 - `checkoutOf` falls back to `jj root` when `git rev-parse` fails, so `plan_check`, Guard 2, and telemetry resolve the checkout inside a plain (non-colocated) jj workspace; colocated jj repos still resolve through git first. The settings loader goes through the same resolution via a new sync `checkoutOfSync`, and telemetry records bound to a jj workspace carry a one-time `record written, not committed: not a git checkout` warning instead of a failed `git commit` per checkpoint. (#38)

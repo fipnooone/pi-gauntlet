@@ -2,7 +2,7 @@ schema: 1
 spec: doc/specs/2026-09-17-gh-37-worktree-by-path.md
 run_id: 07d2838a-8b9d-4388-a4d5-2f129fcd57b7
 branch: gh-37-worktree-by-path
-status: in_progress
+status: shipped
 created_at: 2026-09-17T16:11:45Z
 sessions:
   - 01a0b023-0765-77e4-be3a-6a07cfd4c0a9
@@ -65,6 +65,7 @@ agent_overrides:
     model: github-copilot/gpt-5.6-terra
     thinking: medium
 approved_at: 2026-09-17T16:51:42Z
+shipped_at: 2026-09-17T18:56:13Z
 derived:
   duration_s: 2501
   phases:

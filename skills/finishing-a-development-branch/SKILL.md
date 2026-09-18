@@ -177,7 +177,7 @@ fi
 node <bin>/gauntlet-telemetry-salvage.mjs --worktree "$WORKTREE" --base <base-branch>
 ```
 
-The salvage prints one line per spec on the branch (`present`, `restored <path> from <sha>`, `no telemetry run`, `never written`, `restore failed <path>: <reason>`) and always exits 0. Print its stdout verbatim in the ship completion message. A `restore failed` line is reported, never retried, and never blocks the ship - the record stays recoverable from the branch ref.
+The salvage prints one line per spec on the branch (`present`, `present <path> (marked shipped)`, `restored <path> from <sha>`, `restored <path> from <sha> (marked shipped)`, `no telemetry run`, `never written`, `restore failed <path>: <reason>`) and always exits 0. `(marked shipped)` means the record was still `in_progress` with no ship phase (the recorder lost its binding) and the salvage committed `status: shipped` + `shipped_at` as one `telemetry:` commit; it rides the squash or push like any branch commit. Print its stdout verbatim in the ship completion message. A `restore failed` line is reported, never retried, and never blocks the ship - the record stays recoverable from the branch ref.
 
 #### Option 1: Squash-merge to base
 

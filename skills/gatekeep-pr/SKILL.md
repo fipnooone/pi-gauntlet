@@ -174,6 +174,7 @@ verification command may write to the tree while the Reviewer reads it):
   squash. On a cell with no push row (fork overlay, report-only states) the same
   finding is a non-blocking follow-up instead: the record stays recoverable from the
   PR head ref after merge, and blocking would stop a ship the gate cannot repair.
+  `unfinished <path>` (record still `in_progress` with no ship phase) also lands in `## Evidence` as one line and is non-blocking: pre-landing `in_progress` is normal, and the merge course's salvage run stamps it.
 - **Evidence:** On the CI path, list each satisfying check's name, conclusion, assessed SHA, and run URL - there is no command or raw_tail to paste. On the local path, paste each run's `command` and `raw_tail` verbatim, fenced - never
   paraphrased. Any authored summary is labeled as a summary and never substitutes for
   `raw_tail`.
@@ -256,7 +257,7 @@ are never bundled into one selection, with one scoped exception: the selected me
 course first runs `node <bin>/gauntlet-telemetry-salvage.mjs --worktree <provisioned
 path> --base origin/<baseRefName>` (no `--check`). `present` -> merge as-is. `restored
 <path> from <sha>` -> push that single `telemetry: restore` commit as part of this
-course, re-fetch `headRefOid`, and pass the new SHA to `--match-head-commit`. `restore
+course, re-fetch `headRefOid`, and pass the new SHA to `--match-head-commit`. A line ending `(marked shipped)` (`present` or `restored`) is handled the same way: push that single `telemetry:` commit, re-fetch `headRefOid`, pass the new SHA. `restore
 failed` -> merge proceeds, the reason is printed, and the follow-up names recovery
 from the PR head ref.
 
@@ -508,7 +509,7 @@ The menu is a state machine, not a one-shot report:
    reviewed doc edits selected alongside them (one commit, or one per batch
    sequentially; subjects name the fixes) - then re-resolves the evidence for the new head **once** (the brief's stale-head row: prior evidence is stale; the local command executes only on a fallback/opt-out resolution). Before the push, run
    `node <bin>/gauntlet-telemetry-salvage.mjs --worktree <provisioned path> --base
-   origin/<baseRefName>` (no `--check`); a `restored` commit rides the wave's single
+   origin/<baseRefName>` (no `--check`); a `restored` or `(marked shipped)` commit rides the wave's single
    push and the pushed SHA becomes the assessed head under the course's-own-push rule
    in step 1. Print its stdout in the re-rendered report's `## Evidence`. **On
    green**, push **once**; gate and push are per-wave invariants, never per-fix or

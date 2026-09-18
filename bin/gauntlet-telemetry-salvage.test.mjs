@@ -11,6 +11,11 @@
   const REC = ".pi/gauntlet/telemetry/doc/specs/x.yaml";
   const RECORD_V1 = "schema: 1\nspec: doc/specs/x.md\nstatus: in_progress\n";
   const RECORD_V2 = "schema: 1\nspec: doc/specs/x.md\nstatus: shipped\n";
+  // Records parseRecord accepts (run_id present). UNFINISHED: in_progress, no ship phase.
+  const UNFINISHED = "schema: 1\nspec: doc/specs/x.md\nrun_id: r-1\nstatus: in_progress\ncreated_at: 2026-09-17T16:11:45Z\nderived:\n  duration_s: 60\n  phases:\n    brainstorm: { started_at: 2026-09-17T16:11:45Z, duration_s: 60 }\n";
+  const SHIP_PHASE = UNFINISHED.replace("    brainstorm:", "    ship: { started_at: 2026-09-17T16:12:45Z }\n    brainstorm:");
+  const SCALAR_PHASES = UNFINISHED.replace("  phases:\n    brainstorm: { started_at: 2026-09-17T16:11:45Z, duration_s: 60 }", "  phases: nope");
+  const FINISHED = UNFINISHED.replace("status: in_progress", "status: shipped\nshipped_at: 2026-09-17T18:56:13Z");
 
   const git = (cwd, args, env = {}) =>
     spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], {
@@ -32,7 +37,7 @@
     return out(root, ["rev-parse", "HEAD"]);
   };
   // main: README only. feat: spec (+ record when withRecord).
-  const repo = ({ withRecord = true } = {}) => {
+  const repo = ({ withRecord = true, record = RECORD_V1 } = {}) => {
     const root = mkdtempSync(join(tmpdir(), "gts-"));
     git(root, ["init", "-q", "-b", "main"]);
     write(root, "README.md", "# fixture\n");
@@ -41,7 +46,7 @@
     write(root, SPEC, "# Spec X\n\n**Goal:** g.\n");
     commit(root, "Add spec", SPEC);
     if (withRecord) {
-      write(root, REC, RECORD_V1);
+      write(root, REC, record);
       commit(root, "telemetry: doc/specs/x.md", REC);
     }
     return root;
@@ -346,6 +351,103 @@ PATH="${process.env.PATH.split(":").filter((part) => part !== bin).join(":")}" e
     const r = run(root);
     assert.match(r.stdout, /^restored /);
     assert.equal(out(remote, ["for-each-ref"]), remoteBefore);
+  });
+
+  test("present + unfinished -> stamped shipped, one telemetry: commit, clean tree", (t) => {
+    const root = repo({ record: UNFINISHED }); cleanup(t, root);
+    const n = commitCount(root);
+    const r = run(root);
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.lines, [`present ${REC} (marked shipped)`]);
+    const text = readFileSync(join(root, REC), "utf8");
+    assert.match(text, /^status: shipped$/m);
+    assert.match(text, /^shipped_at: \d{4}-\d{2}-\d{2}T/m);
+    assert.doesNotMatch(text, /in_progress/);
+    assert.equal(commitCount(root), n + 1);
+    assert.equal(headSubject(root), `telemetry: mark ${REC} shipped at landing`);
+    assert.deepEqual(headFiles(root), [REC]);
+    assert.equal(porcelain(root), "");
+  });
+
+  test("present + scalar phases -> stamped shipped, exit 0", (t) => {
+    const root = repo({ record: SCALAR_PHASES }); cleanup(t, root);
+    const r = run(root);
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.lines, [`present ${REC} (marked shipped)`]);
+    assert.match(readFileSync(join(root, REC), "utf8"), /^status: shipped$/m);
+  });
+
+  test("present + in_progress with a ship phase -> untouched", (t) => {
+    const root = repo({ record: SHIP_PHASE }); cleanup(t, root);
+    const before = head(root);
+    const r = run(root);
+    assert.deepEqual(r.lines, [`present ${REC}`]);
+    assert.equal(head(root), before);
+    assert.equal(readFileSync(join(root, REC), "utf8"), SHIP_PHASE);
+  });
+
+  test("present + unfinished but worktree copy dirty -> untouched, present", (t) => {
+    const root = repo({ record: UNFINISHED }); cleanup(t, root);
+    write(root, REC, UNFINISHED + "# local edit\n");
+    const before = head(root);
+    const r = run(root);
+    assert.deepEqual(r.lines, [`present ${REC}`]);
+    assert.equal(head(root), before);
+    assert.equal(readFileSync(join(root, REC), "utf8"), UNFINISHED + "# local edit\n");
+  });
+
+  test("present + already shipped -> byte-identical, no commit", (t) => {
+    const root = repo({ record: FINISHED }); cleanup(t, root);
+    const before = head(root);
+    const r = run(root);
+    assert.deepEqual(r.lines, [`present ${REC}`]);
+    assert.equal(head(root), before);
+    assert.equal(readFileSync(join(root, REC), "utf8"), FINISHED);
+  });
+
+  test("restore with scalar phases -> stamped shipped, exit 0", (t) => {
+    const root = repo({ record: SCALAR_PHASES }); cleanup(t, root);
+    const del = rmCommit(root, "strip", REC);
+    const r = run(root);
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.lines, [`restored ${REC} from ${del} (marked shipped)`]);
+    assert.match(out(root, ["show", `HEAD:${REC}`]), /^status: shipped$/m);
+  });
+
+  test("restore of an unfinished record -> one commit whose bytes carry the stamp", (t) => {
+    const root = repo({ record: UNFINISHED }); cleanup(t, root);
+    const del = rmCommit(root, "strip", REC);
+    write(root, REC, UNFINISHED);
+    const n = commitCount(root);
+    const r = run(root);
+    assert.deepEqual(r.lines, [`restored ${REC} from ${del} (marked shipped)`]);
+    assert.equal(commitCount(root), n + 1);
+    const committed = out(root, ["show", `HEAD:${REC}`]);
+    assert.match(committed, /^status: shipped$/m);
+    assert.match(committed, /^shipped_at: /m);
+    assert.equal(porcelain(root), "");
+  });
+
+  test("--check on present + unfinished -> unfinished <rec>, nothing changes", (t) => {
+    const root = repo({ record: UNFINISHED }); cleanup(t, root);
+    const before = head(root);
+    const r = run(root, ["--check"]);
+    assert.deepEqual(r.lines, [`unfinished ${REC}`]);
+    assert.equal(head(root), before);
+    assert.equal(readFileSync(join(root, REC), "utf8"), UNFINISHED);
+    assert.equal(porcelain(root), "");
+  });
+
+  test("present + unfinished, rejecting pre-commit hook -> restore failed, HEAD bytes and index restored", (t) => {
+    const root = repo({ record: UNFINISHED }); cleanup(t, root);
+    write(root, ".git/hooks/pre-commit", "#!/bin/sh\nexit 1\n");
+    chmodSync(join(root, ".git/hooks/pre-commit"), 0o755);
+    const before = head(root);
+    const r = run(root);
+    assert.match(r.stdout, new RegExp(`^restore failed ${REC.replace(/\./g, "\\.")}: `));
+    assert.equal(head(root), before);
+    assert.equal(readFileSync(join(root, REC), "utf8"), UNFINISHED);
+    assert.equal(porcelain(root), "");
   });
 
   test("finishing Option 1 fixture: strip-on-branch + salvage + merge --squash leaves the record, not the plan, staged", (t) => {

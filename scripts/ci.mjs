@@ -32,6 +32,7 @@ if (!pkg.license) fail("package.json: missing license field");
 if (pkg.engines?.node !== ">=24.15.0") fail('package.json: engines.node must equal ">=24.15.0"');
 if (pkg.bin?.["gauntlet-spec-index"] !== "bin/gauntlet-spec-index.mjs") fail("package.json: bin.gauntlet-spec-index must point at bin/gauntlet-spec-index.mjs");
 if (pkg.bin?.["gauntlet-telemetry-salvage"] !== "bin/gauntlet-telemetry-salvage.mjs") fail("package.json: bin.gauntlet-telemetry-salvage must point at bin/gauntlet-telemetry-salvage.mjs");
+if (pkg.bin?.["gauntlet-performance"] !== "bin/gauntlet-performance.mjs") fail("package.json: bin.gauntlet-performance must point at bin/gauntlet-performance.mjs");
 const dependencyKeys = Object.keys(pkg.dependencies || {}).sort();
 if (JSON.stringify(dependencyKeys) !== JSON.stringify(["yaml"])) {
   fail(`package.json: dependencies must contain exactly "yaml" (got ${dependencyKeys.join(", ") || "none"})`);
@@ -251,6 +252,7 @@ if (!existsSync(R("skills/brainstorming/../../bin/gauntlet-spec-index.mjs"))) {
 for (const skill of ["skills/finishing-a-development-branch", "skills/gatekeep-pr"]) {
   if (!existsSync(R(`${skill}/../../bin/gauntlet-telemetry-salvage.mjs`))) fail(`gauntlet-telemetry-salvage: path from ${skill} does not resolve`);
 }
+if (!existsSync(R("skills/gauntlet-performance/../../bin/gauntlet-performance.mjs"))) fail("gauntlet-performance: path from skills/gauntlet-performance does not resolve");
 // Telemetry record is a deliverable: the rule and the salvage call sites cannot be edited away silently.
 {
   const worktreeFirst = txt("skills/brainstorming/SKILL.md").split(/^## /m).find((s) => s.startsWith("Worktree First")) ?? "";
@@ -324,6 +326,7 @@ try {
       R("extensions/telemetry.test.ts"),
       R("bin/gauntlet-spec-index.test.mjs"),
       R("bin/gauntlet-telemetry-salvage.test.mjs"),
+      R("bin/gauntlet-performance.test.mjs"),
     ],
     { stdio: "pipe" },
   );
@@ -460,6 +463,8 @@ try {
     "extensions/lib/gauntlet-settings-loader.ts",
     "bin/gauntlet-spec-index.mjs",
     "bin/gauntlet-telemetry-salvage.mjs",
+    "bin/gauntlet-performance.mjs",
+    "extensions/lib/telemetry-record.ts",
     "extensions/lib/telemetry-paths.ts",
     "extensions/lib/telemetry-ship.ts",
     "extensions/lib/phase-tracker-helpers.ts",
