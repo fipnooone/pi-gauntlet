@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.11.0 - 2026-09-18
 
 - `checkoutOf` falls back to `jj root` when `git rev-parse` fails, so `plan_check`, Guard 2, and telemetry resolve the checkout inside a plain (non-colocated) jj workspace; colocated jj repos still resolve through git first. The settings loader goes through the same resolution via a new sync `checkoutOfSync`, and telemetry records bound to a jj workspace carry a one-time `record written, not committed: not a git checkout` warning instead of a failed `git commit` per checkpoint. (#38)
 
