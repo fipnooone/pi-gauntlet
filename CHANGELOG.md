@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `skills/brainstorming/SKILL.md`: restore precision the 5.10.0 dedup dropped - first-feature round 1 lists the concrete decisions (public types/files/routes/identifiers; abstraction location/responsibility/boundary; schema entity names/field types/indexing), doc updates ship in the same commit as the code, the premise note is full sentences and an unverified claim is not a stop, a multi-concern request is decomposed rather than designed as one spec, 300-500 words is a target per round, and the gather-stop red flag links to `gatherer.md`.
+
 ## v5.10.0 - 2026-09-18
 
 - Council provenance: member findings (except `over-spec`) end with `probed: <source or check> - <result> | none`; the chair tags each suggested edit `grounded:` or `hypothesis:` (`external-ref:` and `over-spec:` clusters stay untagged); `roasting-the-spec` probes `hypothesis` data-shape claims once (bounded, read-only, artifact at hand) before applying, else lands them as one grouped Open Question per artifact; `Applied:` audit lines carry the probe.

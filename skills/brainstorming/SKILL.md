@@ -82,7 +82,7 @@ One spec is default. Test seemingly independent concerns against `../shape-ticke
     outcome: <what a user observes once it ships>
     axis: <one item from the closed list>
 
-If any test fails, offer no split. Never split by service, package, repo, layer, or team. If all pass, ask whether to brainstorm the independent specs separately or explain their coupling.
+If any test fails, offer no split. Never split by service, package, repo, layer, or team. If all pass, ask whether to brainstorm the independent specs separately or explain their coupling. Decompose a genuinely multi-concern request; never design it as one spec.
 
 ### 3. Understand the idea
 
@@ -92,7 +92,7 @@ Ask one question per message, preferably multiple choice, about purpose, constra
 
 Append only citable findings - schemas, hard constraints, contradictions, and scope-changing answers - to `## Appended during questionary` using `edit`.
 
-Before approaches, state in chat the supported, disproved, corrected, and unverified premises with sources and attempted lookups. Put unverified claims in Open Questions or assumptions. If a load-bearing claim is contradicted, the premise note is your next message - even as question one - and asks the user to accept the corrected fact or override it; ask nothing else and propose nothing until answered. Record the outcome in the draft for `## Problem` or the relevant design decision.
+Before approaches, state in chat the supported, disproved, corrected, and unverified premises with sources and attempted lookups, in full sentences - no status-keyword lists, no template; if the design depends on no claims, one sentence says so. An unverified claim is not a stop: put it in Open Questions or a stated assumption. If a load-bearing claim is contradicted, the premise note is your next message - even as question one - and asks the user to accept the corrected fact or override it; ask nothing else and propose nothing until answered. Record the outcome in the draft for `## Problem` or the relevant design decision.
 
 ### 4. Explore approaches
 
@@ -104,7 +104,7 @@ Prefer clear testable boundaries, YAGNI, existing conventions, the owning schema
 
 ### 6. Present the design in two rounds
 
-Use two 300-500-word rounds with one approval each; revisions remain within that approval point. Ask once per round; round-1 approval without correction confirms the predecessor. Round 1 covers architecture, responsibilities, data flow, and `supersedes <path>, <scope>` when applicable. Round 2 covers errors, edges, tests, and `## Documentation impact`.
+Use two rounds, targeting 300-500 words each, with one approval each; revisions remain within that approval point. Ask once per round; round-1 approval without correction confirms the predecessor. Round 1 covers architecture, responsibilities, data flow, and `supersedes <path>, <scope>` when applicable. Round 2 covers errors, edges, tests, and `## Documentation impact`.
 
 `## Documentation impact` is required. Cite `reference/documentation-impact.md` by relative path, do not restate its categories, and reproduce this template verbatim:
 
@@ -115,7 +115,7 @@ Use two 300-500-word rounds with one approval each; revisions remain within that
   - Derived / memory docs invalidated: <routers / AGENTS.md sections / topic guides / indexes, or "none">
   ```
 
-Use doc names, `none`, or `deferred: <trigger>`. Apply `reference/documentation-impact.md`; amend an owner before creating a standalone file. Put project taxonomy in the overrides file's `## documentation` block. Ship doc updates with code and verify them at conformance. Clarify when needed.
+Use doc names, `none`, or `deferred: <trigger>`. Apply `reference/documentation-impact.md`; amend the existing owner; create a standalone file only where no doc owns the topic. Put project taxonomy in the overrides file's `## documentation` block (guidance only; no settings key). Doc updates ship in the same commit as the code and the conformance gate verifies them against the spec. Clarify when needed.
 
 ## Ticket Handling
 
@@ -123,7 +123,7 @@ A ticket is guidance, not sole truth. Fetch it; propose scope, approach, or acce
 
 ## First-Feature Oversight (Early Project Stages)
 
-For the first two features of a new module, long-lived component, schema area, or repeatable pattern, round 1 explicitly covers structure, naming, shared abstractions, persistence/schema, and proposed AGENTS.md/docs changes. Use no separate confirmation; later features follow established patterns.
+For the first two features of a new module, long-lived component, schema area, or repeatable pattern, round 1 explicitly lists: directory and module structure; naming of public types, files, routes, and identifiers; each new shared abstraction's location, responsibility, and boundary; persistence/schema entity names, field types, and indexing; proposed AGENTS.md/docs additions. Use no separate confirmation; later features follow established patterns.
 
 ## Anti-Pattern: "Too simple to need a design"
 
@@ -267,7 +267,7 @@ One question at a time, YAGNI, 2-3 approaches, two design rounds, clarify freely
 - Inline scope or ambiguity checks ([owner](#spec-council-optional)).
 - Gate after failed/skipped critique or before placeholder re-scan ([owner](#spec-self-review-before-user-review-gate)).
 - Gate without summary `Read` last, or with a paraphrased summary ([owner](#user-review-gate)).
-- Human stop between gather and question one ([owner](#the-process)).
+- Human stop between gather and question one ([owner](gatherer.md)).
 - Proposed-change execution before approval ([owner](#hard-constraint)).
 - Plan before approval; brainstorming invocation for an amend ([owner](#user-review-gate)).
 - Missing predecessor banner; invalid multi-spec split ([owner](#spec-self-review-before-user-review-gate); [owner](#2-scope-check)).
