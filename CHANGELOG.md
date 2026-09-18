@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.10.1 - 2026-09-18
 
 - `skills/brainstorming/SKILL.md`: restore precision the 5.10.0 dedup dropped - first-feature round 1 lists the concrete decisions (public types/files/routes/identifiers; abstraction location/responsibility/boundary; schema entity names/field types/indexing), doc updates ship in the same commit as the code, the premise note is full sentences and an unverified claim is not a stop, a multi-concern request is decomposed rather than designed as one spec, 300-500 words is a target per round, and the gather-stop red flag links to `gatherer.md`.
 
