@@ -31,6 +31,7 @@ if (pkg.private) fail("package.json: private:true would block publish");
 if (!pkg.license) fail("package.json: missing license field");
 if (pkg.engines?.node !== ">=24.15.0") fail('package.json: engines.node must equal ">=24.15.0"');
 if (pkg.bin?.["gauntlet-spec-index"] !== "bin/gauntlet-spec-index.mjs") fail("package.json: bin.gauntlet-spec-index must point at bin/gauntlet-spec-index.mjs");
+if (pkg.bin?.["gauntlet-telemetry-salvage"] !== "bin/gauntlet-telemetry-salvage.mjs") fail("package.json: bin.gauntlet-telemetry-salvage must point at bin/gauntlet-telemetry-salvage.mjs");
 const dependencyKeys = Object.keys(pkg.dependencies || {}).sort();
 if (JSON.stringify(dependencyKeys) !== JSON.stringify(["yaml"])) {
   fail(`package.json: dependencies must contain exactly "yaml" (got ${dependencyKeys.join(", ") || "none"})`);
@@ -247,6 +248,24 @@ if (!existsSync(R("skills/brainstorming/reference/superseding.md"))) {
 if (!existsSync(R("skills/brainstorming/../../bin/gauntlet-spec-index.mjs"))) {
   fail("gauntlet-spec-index: path from skills/brainstorming does not resolve");
 }
+for (const skill of ["skills/finishing-a-development-branch", "skills/gatekeep-pr"]) {
+  if (!existsSync(R(`${skill}/../../bin/gauntlet-telemetry-salvage.mjs`))) fail(`gauntlet-telemetry-salvage: path from ${skill} does not resolve`);
+}
+// Telemetry record is a deliverable: the rule and the salvage call sites cannot be edited away silently.
+{
+  const worktreeFirst = txt("skills/brainstorming/SKILL.md").split(/^## /m).find((s) => s.startsWith("Worktree First")) ?? "";
+  if (!worktreeFirst.includes("telemetry record")) fail("skills/brainstorming/SKILL.md: Worktree First must name the telemetry record as a deliverable");
+  const finishing = txt("skills/finishing-a-development-branch/SKILL.md");
+  if (!finishing.includes("gauntlet-telemetry-salvage.mjs")) fail("skills/finishing-a-development-branch/SKILL.md: missing the gauntlet-telemetry-salvage.mjs call");
+  for (const opt of ["#### Option 1: Squash-merge to base", "#### Option 2: Push and Create PR"]) {
+    const block = finishing.split(opt)[1]?.split(/^#### /m)[0] ?? "";
+    if (!block.includes("telemetry record")) fail(`skills/finishing-a-development-branch/SKILL.md: "${opt}" must name the telemetry record`);
+  }
+  const gate = txt("skills/gatekeep-pr/SKILL.md");
+  const postSelection = gate.split(/^## Post-selection loop/m)[1]?.split(/^## /m)[0] ?? "";
+  if (!postSelection.includes("gauntlet-telemetry-salvage.mjs")) fail("skills/gatekeep-pr/SKILL.md: Post-selection loop must call gauntlet-telemetry-salvage.mjs");
+  if (!/never delete[^\n]*telemetry/.test(postSelection)) fail("skills/gatekeep-pr/SKILL.md: Post-selection loop must forbid deleting the telemetry record");
+}
 // touched-files + over-spec in the same paragraph of conformance-check.md
 const ccParas = txt("skills/verification-before-completion/reference/conformance-check.md").split(/\n\s*\n/);
 if (!ccParas.some((p) => p.includes("touched-files") && p.includes("over-spec"))) fail("conformance-check.md: no paragraph carries both `touched-files` and `over-spec`");
@@ -304,12 +323,13 @@ try {
       R("extensions/lib/telemetry-ship.test.ts"),
       R("extensions/telemetry.test.ts"),
       R("bin/gauntlet-spec-index.test.mjs"),
+      R("bin/gauntlet-telemetry-salvage.test.mjs"),
     ],
     { stdio: "pipe" },
   );
-  ok("resolver and gauntlet-spec-index unit tests pass");
+  ok("resolver and bin unit tests pass");
 } catch (e) {
-  fail(`resolver or gauntlet-spec-index unit tests failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
+  fail(`resolver or bin unit tests failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
 }
 
 // ---- executable skill examples --------------------------------------------
@@ -439,13 +459,17 @@ try {
     "extensions/lib/gauntlet-settings.ts",
     "extensions/lib/gauntlet-settings-loader.ts",
     "bin/gauntlet-spec-index.mjs",
+    "bin/gauntlet-telemetry-salvage.mjs",
+    "extensions/lib/telemetry-paths.ts",
+    "extensions/lib/telemetry-ship.ts",
+    "extensions/lib/phase-tracker-helpers.ts",
   ]) {
     if (!packed.includes(need)) fail(`npm pack: ${need} missing from tarball (runtime would fail)`);
   }
   if (!packed.some((f) => f.startsWith("agents/"))) fail("npm pack: no agents/ in tarball");
   if (packed.some((f) => f.startsWith("doc/"))) fail("npm pack: doc/ leaked into tarball");
   if (packed.some((f) => f.startsWith(".claude-plugin/"))) fail("npm pack: .claude-plugin/ leaked into tarball (Claude Code marketplace is source-only)");
-  ok(`npm pack: ${packed.length} files, agents/ + bin/gauntlet-spec-index.mjs present, no doc/ leak`);
+  ok(`npm pack: ${packed.length} files, agents/ + bin/*.mjs and their extension imports present, no doc/ leak`);
 } catch (e) {
   fail(`npm pack failed: ${String(e.stderr || e).split("\n")[0]}`);
 }

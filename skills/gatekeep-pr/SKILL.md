@@ -164,6 +164,16 @@ verification command may write to the tree while the Reviewer reads it):
   `<sha>` is the assessed `headRefOid`, `<url>` degrades to `unavailable` when
   absent. Provenance checks on `worktree_root`/`run_cwd` bind only to the local
   path.
+- **Telemetry record:** run `node <bin>/gauntlet-telemetry-salvage.mjs --worktree
+  <provisioned path> --base origin/<baseRefName> --check` (`<bin>` = `<directory of
+  this skill's SKILL.md>/../../bin`). Detect-only: it never mutates. `present` / `no
+  telemetry run` / `never written` land in `## Evidence` as one line each. `stripped
+  <path> in <sha>` mints a blocking `P#` (`source_ref`:
+  `gauntlet-telemetry-salvage`) whose drafted fix is "run the salvage without
+  `--check`" - the spec and its telemetry record are deliverables that ship in the
+  squash. On a cell with no push row (fork overlay, report-only states) the same
+  finding is a non-blocking follow-up instead: the record stays recoverable from the
+  PR head ref after merge, and blocking would stop a ship the gate cannot repair.
 - **Evidence:** On the CI path, list each satisfying check's name, conclusion, assessed SHA, and run URL - there is no command or raw_tail to paste. On the local path, paste each run's `command` and `raw_tail` verbatim, fenced - never
   paraphrased. Any authored summary is labeled as a summary and never substitutes for
   `raw_tail`.
@@ -242,7 +252,13 @@ head (fixes pushed first); explicit selection with a head compare-and-swap that
 passes. A merge selection while any precondition fails is refused, naming the failing
 precondition, and the menu re-renders - never a dead end, never a silent merge. Merge
 always executes as `gh pr merge --match-head-commit <assessed-sha>`; push and merge
-are never bundled into one selection.
+are never bundled into one selection, with one scoped exception: the selected merge
+course first runs `node <bin>/gauntlet-telemetry-salvage.mjs --worktree <provisioned
+path> --base origin/<baseRefName>` (no `--check`). `present` -> merge as-is. `restored
+<path> from <sha>` -> push that single `telemetry: restore` commit as part of this
+course, re-fetch `headRefOid`, and pass the new SHA to `--match-head-commit`. `restore
+failed` -> merge proceeds, the reason is printed, and the follow-up names recovery
+from the PR head ref.
 
 **Consent menu** (deterministic - this table is the golden-scenario oracle):
 
@@ -364,7 +380,8 @@ Actions (compose freely in the custom row):
                                                                         reviewed doc edits exist
                                                                         in the worktree)
   merge-squash | merge-commit                                          (preconditions per Verdict;
-                                                                        never bundled with a push)
+                                                                        never bundled with a push,
+                                                                        except the telemetry: restore commit)
   request-changes | review-comment | approve                           (approve: never own PR)
   reply <C#s>      post drafted thread replies
   tracker <act>    tracker action                                      (only when a tracker tool resolved)
@@ -474,8 +491,11 @@ The menu is a state machine, not a one-shot report:
    orchestrator owns commit, gate, and push - never a child. Every dispatched
    child gets `cwd` = the PR worktree, **`worktree: true` forbidden** (a separate
    isolated worktree breaks the shared-tree contract - see Inline-first
-   execution); is **edit-only, no git commands, no verification runs**; and its
-   task is that batch's `P#` lines **plus the drafted edit already keyed to each
+   execution); is **edit-only, no git commands, no verification runs**, and must
+   never delete `.pi/gauntlet/telemetry/**` or anything under the configured
+   telemetry dir (a fix that "cleans up" the run's telemetry record is a defect in
+   the fix - the record is a deliverable); and its task is that batch's `P#` lines
+   **plus the drafted edit already keyed to each
    ID** in `## Drafted fixes / review` - the child applies the consented payload,
    it does not re-solve the finding. Below the cutoff (<= 2 worktree-fixable findings), the orchestrator
    applies inline instead of dispatching - the no-cohort path stays available at
@@ -486,7 +506,11 @@ The menu is a state machine, not a one-shot report:
    Once every dispatched/inline batch returns, the orchestrator commits the golden
    course as one local commit set - the code fixes plus any already-applied
    reviewed doc edits selected alongside them (one commit, or one per batch
-   sequentially; subjects name the fixes) - then re-resolves the evidence for the new head **once** (the brief's stale-head row: prior evidence is stale; the local command executes only on a fallback/opt-out resolution). **On
+   sequentially; subjects name the fixes) - then re-resolves the evidence for the new head **once** (the brief's stale-head row: prior evidence is stale; the local command executes only on a fallback/opt-out resolution). Before the push, run
+   `node <bin>/gauntlet-telemetry-salvage.mjs --worktree <provisioned path> --base
+   origin/<baseRefName>` (no `--check`); a `restored` commit rides the wave's single
+   push and the pushed SHA becomes the assessed head under the course's-own-push rule
+   in step 1. Print its stdout in the re-rendered report's `## Evidence`. **On
    green**, push **once**; gate and push are per-wave invariants, never per-fix or
    per-batch. **On red**, do not push: leave the commit(s) local, re-render with
    the unresolved `P#`s still open, and warn that unpushed fix commits sit in the

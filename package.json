@@ -32,7 +32,8 @@
     "CHANGELOG.md"
   ],
   "bin": {
-    "gauntlet-spec-index": "bin/gauntlet-spec-index.mjs"
+    "gauntlet-spec-index": "bin/gauntlet-spec-index.mjs",
+    "gauntlet-telemetry-salvage": "bin/gauntlet-telemetry-salvage.mjs"
   },
   "engines": {
     "node": ">=24.15.0"

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The telemetry record is a deliverable: brainstorming, `finishing-a-development-branch`, and `gatekeep-pr` name it beside the spec, and a new shipped `gauntlet-telemetry-salvage` bin restores a record that a plan strip or a fix commit deleted (from the deleting commit's parent, as one `telemetry: ` commit, exit 0 for valid invocations, never pushes). Finishing strips the plan on the feature branch before the Option 1 squash; gatekeep-pr checks at assessment, restores after each fix wave, and restores as the first step of a merge course. CI pins the bin, its test, its tarball imports, and the rule's presence in the three skills.
+
 ## v5.10.1 - 2026-09-18
 
 - `skills/brainstorming/SKILL.md`: restore precision the 5.10.0 dedup dropped - first-feature round 1 lists the concrete decisions (public types/files/routes/identifiers; abstraction location/responsibility/boundary; schema entity names/field types/indexing), doc updates ship in the same commit as the code, the premise note is full sentences and an unverified claim is not a stop, a multi-concern request is decomposed rather than designed as one spec, 300-500 words is a target per round, and the gather-stop red flag links to `gatherer.md`.

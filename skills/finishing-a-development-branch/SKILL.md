@@ -162,18 +162,38 @@ Which option?
 
 ### Step 5: Execute Choice
 
+#### Strip the plan, keep the record (Options 1 and 2)
+
+Run this on the feature branch before either landing path. The spec and its telemetry record (`<telemetry.dir>/<spec path with .md -> .yaml>`, default `.pi/gauntlet/telemetry/doc/specs/<spec>.yaml`) are deliverables and ship in the squash; only the plan is stripped. `<bin>` is `<directory of this skill's SKILL.md>/../../bin`, resolved from the skill's `<location>` in the system prompt.
+
+```bash
+# Plans are ephemeral - if one was committed on this branch, remove it before landing.
+PLAN_PATH=doc/plans/<plan-file>.md   # or <service>/doc/plans/<plan-file>.md
+if git -C "$WORKTREE" ls-files --error-unmatch "$PLAN_PATH" >/dev/null 2>&1; then
+  git -C "$WORKTREE" rm "$PLAN_PATH" && git -C "$WORKTREE" commit -m "Remove ephemeral plan doc"
+fi
+
+# The telemetry record is a deliverable - restore it if a strip or a stray delete removed it.
+node <bin>/gauntlet-telemetry-salvage.mjs --worktree "$WORKTREE" --base <base-branch>
+```
+
+The salvage prints one line per spec on the branch (`present`, `restored <path> from <sha>`, `no telemetry run`, `never written`, `restore failed <path>: <reason>`) and always exits 0. Print its stdout verbatim in the ship completion message. A `restore failed` line is reported, never retried, and never blocks the ship - the record stays recoverable from the branch ref.
+
 #### Option 1: Squash-merge to base
+
+Run the strip-and-salvage block above first (plan stripped, telemetry record kept), then:
 
 ```bash
 git -C "$PRIMARY" checkout <base-branch>
 git -C "$PRIMARY" pull
 git -C "$PRIMARY" merge --squash "$FEATURE"
-git -C "$PRIMARY" rm doc/plans/<plan-file>.md   # or <service>/doc/plans/<plan-file>.md
 git -C "$PRIMARY" commit -m "<imperative summary> (ref <ticket-id>)"
 (cd "$PRIMARY" && <Step 1 command for the service(s) touched>)
 ```
 
-The post-squash re-verify is not optional — `git merge --squash` can surface conflict-resolution mistakes the worktree-side run couldn't catch.
+The plan was already removed on the branch, so the staged squash tree carries the spec, the telemetry record, and the implementation - never the plan.
+
+The post-squash re-verify is not optional - `git merge --squash` can surface conflict-resolution mistakes the worktree-side run couldn't catch.
 
 Cleanup worktree (Step 6), then, if Step 6 removed the worktree, `git -C "$PRIMARY" branch -D "$FEATURE"`.
 
@@ -181,16 +201,14 @@ Cleanup worktree (Step 6), then, if Step 6 removed the worktree, `git -C "$PRIMA
 
 #### Option 2: Push and Create PR
 
-```bash
-# Plans are ephemeral - if one was committed on this branch, remove it before the PR diff is opened.
-PLAN_PATH=doc/plans/<plan-file>.md   # or <service>/doc/plans/<plan-file>.md
-if git -C "$WORKTREE" ls-files --error-unmatch "$PLAN_PATH" >/dev/null 2>&1; then
-  git -C "$WORKTREE" rm "$PLAN_PATH" && git -C "$WORKTREE" commit -m "Remove ephemeral plan doc"
-fi
+Run the strip-and-salvage block above first (plan stripped, telemetry record kept), then:
 
+```bash
 # Push branch
 git -C "$WORKTREE" push -u origin "$FEATURE"
+```
 
+```bash
 # Create PR
 (cd "$WORKTREE" && gh pr create --title "<title>" --body "$(cat <<'EOF'
 ## Summary
@@ -245,10 +263,10 @@ Removal precedes branch deletion in both options; `git branch -d`/`-D` fails whi
 
 ## Quick Reference
 
-| Option | Merge | Push | Keep Worktree | Cleanup Branch | Plan-doc removal |
+| Option | Merge | Push | Keep Worktree | Cleanup Branch | Plan strip + record salvage |
 |---|---|---|---|---|---|
-| 1. Squash-merge locally | yes (squash) | - | - | yes (after Step 6 removal) | yes (unconditional) |
-| 2. Create PR | - | yes | yes | - | yes (guarded, before push) |
+| 1. Squash-merge locally | yes (squash) | - | - | yes (after Step 6 removal) | yes (guarded, on the branch before squash) |
+| 2. Create PR | - | yes | yes | - | yes (guarded, on the branch before push) |
 | 3. Keep as-is | - | - | yes | - | - |
 | 4. Discard | - | - | - | yes (force, after Step 6 removal) | - |
 
@@ -284,9 +302,13 @@ A host-owned worktree (Step 6 "Otherwise") keeps both the worktree and the branc
 - **Problem:** Accidentally delete work
 - **Fix:** Require typed "discard" confirmation
 
-**Skipping the plan-doc deletion in Options 1 and 2 (any path that lands on base)**
-- **Problem:** Plan docs are ephemeral and shouldn't land on `<base-branch>`. Forgetting `git -C "$PRIMARY" rm doc/plans/<plan-file>.md` ships scaffolding to main.
-- **Fix:** The plan stays in the deleted branch's git history (`git -C "$PRIMARY" log --all -- doc/plans/...`). Spec stays on `<base-branch>`; plan does not.
+**Skipping the strip-and-salvage block in Options 1 and 2 (any path that lands on base)**
+- **Problem:** Plan docs are ephemeral and shouldn't land on `<base-branch>`; the telemetry record is a deliverable and must. Skipping the block ships the plan, or drops the record the spec index reads.
+- **Fix:** Run the block on `$WORKTREE` before the squash or the push. The plan stays in the branch's git history (`git -C "$PRIMARY" log --all -- doc/plans/...`). Spec and telemetry record stay on `<base-branch>`; plan does not.
+
+**Widening the plan strip to the telemetry record**
+- **Problem:** `.pi/gauntlet/telemetry/**` looks like scaffolding next to the plan and gets deleted in the same commit - main then has no record for the run.
+- **Fix:** Never `git rm` under the telemetry dir. The salvage restores a stripped record, but the deletion should not happen in the first place.
 
 ## Completion
 
@@ -309,10 +331,12 @@ Once the merge (and any deploy) has landed, `/skill:check-delivery <ticket-ref>`
 - Clean up worktrees you didn't create (provenance check)
 - Run any step without the `<worktree-path>` argument
 - Auto-proceed past an undispositioned carried-open gap
-- Skip the guarded plan-doc removal before push on Option 2 when a plan doc was committed
+- Skip the strip-and-salvage block before the Option 1 squash or the Option 2 push
+- Delete the telemetry record (`.pi/gauntlet/telemetry/**` or the configured `telemetry.dir`) on any path
 
 **Always:**
 - Verify tests before offering options
+- Print the `gauntlet-telemetry-salvage.mjs` output verbatim in the ship completion message
 - Derive `$PRIMARY` and `$FEATURE` from `<worktree-path>` before presenting the menu
 - Present exactly 4 options (or 3 for detached HEAD)
 - Get typed confirmation for Option 4

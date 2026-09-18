@@ -127,6 +127,16 @@ Ship: the first `git merge --squash` / `git push` / `gh pr create` (`git -C <pat
 
 Guard: during `brainstorm`, a `write` to a spec whose record has `shipped_at` is blocked (`edit` passes) with a reason naming the record and asking for a new date-slugged spec that supersedes it. Specs shipped before the extension existed have no record and are unguarded.
 
+Deliverable: the record ships in the squash beside the spec; only the plan is stripped (`finishing-a-development-branch` "Strip the plan, keep the record"; `gatekeep-pr` fix waves never delete it). Because agents have deleted records as "scaffolding", every landing path runs the shipped salvage script:
+
+```
+node <package>/bin/gauntlet-telemetry-salvage.mjs --worktree <abs path> [--base <ref>] [--dir <telemetry dir>] [--check]
+```
+
+It reads `piGauntlet.telemetry` from the same two layers as the recorder (preset `$PI_CODING_AGENT_DIR/settings.json`, default `~/.pi/agent`, under `<toplevel>/.pi/settings.json`; `--dir` overrides and is validated by the same resolver), resolves the base (`--base`, else `origin/HEAD`, `main`, `master`), lists `doc/specs/*.md` files changed on the branch, and for each record `<dir>/<spec>.yaml` prints exactly one line: `present <path>`; `restored <path> from <sha>` (the deleting commit - the record is taken from its parent, or from the on-disk copy when the recorder rewrote it, and committed as `telemetry: restore record stripped in <sha[0:10]>`); `no telemetry run <path>` (no `telemetry: ` commit on the branch); `never written <path>` (including when the branch contains the commit that introduced the record but no later deletion); `stripped <path> in <sha>` (with `--check`, detect-only); `restore failed <path>: <reason>` (including `staged copy differs from worktree` for a pre-staged record whose worktree copy differs or is missing, hook rejection, or a 30 s commit timeout; the script rolls back only its own changes). Bare outcomes: `telemetry disabled`, `no base ref`, `no spec on branch`. Every valid invocation exits 0 and the script never pushes; malformed invocation, including an invalid `--dir`, prints usage and exits 1.
+
+Call sites: `finishing-a-development-branch` runs it on the feature branch after the plan strip and before the Option 1 `git merge --squash` (the plan strip now happens on the branch, not on the primary's staged index) or the Option 2 `git push`; `gatekeep-pr` runs `--check` at assessment (a `stripped` result is a blocking `P#`), runs it after every fix wave before that wave's push, and runs it as the first step of a selected merge course - the one case where the gate pushes (that single `telemetry: restore` commit) and merges in the same selection.
+
 Example override (the `buckets` shown replace the defaults):
 
 ```json
