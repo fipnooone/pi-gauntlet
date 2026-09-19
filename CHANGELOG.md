@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.13.0 - 2026-09-19
 
 - Post-approval spec amendments go through a reviewer-first funnel (`skills/brainstorming/reference/amendment-surface.md`): a fresh `spec-council-member` in `Mode: amendment-review` clears evidence-backed factual corrections that touch no human-owned section, a deterministic prefilter sends descopes and acceptance-criteria edits to the human, and escalations render as one readable batch (what / why / example / recommended, real alternatives only) with a one-reply grammar and the standing-grant offer; each batch lands as one `amend:` commit with per-item records. The spec gate offers the grant. `finishing-a-development-branch` runs eligible conformance `accept` gaps through the same funnel before the disposition menu and lists auto-applied amendments above the ship options. `brainstorming/SKILL.md` shrinks; `scripts/ci.mjs` pins the new tokens.
 
