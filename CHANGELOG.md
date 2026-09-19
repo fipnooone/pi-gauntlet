@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.12.1 - 2026-09-19
 
 - Fixed: `gauntlet-telemetry-salvage` and `gauntlet-performance` no longer crash with `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` when run from an npm-installed copy - both bins are now committed esbuild bundles (sources in `src/bins/`, rebuild with `npm run build:bins`), guarded by a CI freshness check, bundle pack assertions, and a packed-install smoke test. (#39)
 
