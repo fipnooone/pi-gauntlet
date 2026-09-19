@@ -88,6 +88,8 @@ Closure / conformance: CONFORMS
 
 then continue directly to Step 4. No approval prompt, no menu, no shared options line, no sign-off. If the run auto-applied fixes, surface the flat `auto-applied fix commits: <Gn: SHA>, ...` index from the durable block as **one informational, non-blocking line** with a one-line revert offer (see "Revert semantics") - a gap that auto-converged mid-verify has no bullet, so this index is the only place its fix commit stays revertable. Do not wait for acknowledgment.
 
+**Pre-menu amendment funnel (GAPS only).** Before rendering the carried-open menu, run [`amendment-surface.md` § Conformance entry](../brainstorming/reference/amendment-surface.md) over the inventory once: gaps with `recommended: accept`, verdict `DRIFTED` or `PARTIAL`, not `UNAUTHORIZED`, whose `origin` is not an acceptance criterion are drafted as `accept-into-spec` items (the edit built from `origin` + `evidence`) and sent to the reviewer in one call; cleared items apply and land as one batch commit, the spec is re-audited, the inventory regenerated. Only concerns the re-audit actually closed drop out; sibling concerns in the same gap keep their rows and dispositions. Survivors and every other gap render as ordinary rows below - one menu, never two.
+
 **Carried-open (`status: GAPS (N open)`).** Read `reference/disposition-protocol.md` and follow it for the carried-open render (dense) grammar, the response grammar, and the 9-step execute order. Render the human decision menu in the shape below, drive the dispositions per that reference, then print the summary render and continue to Step 4. If that reference file cannot be read, stop and surface a blocking error — do **not** improvise the grammar from memory.
 
 Representative carried-open render (multi-concern gap split to `e2e`; single-concern gap `cache`; `UNAUTHORIZED` gap `auth`):
@@ -132,6 +134,15 @@ Three tiers, increasing cost — name the tier when a revert is requested:
 A **heavy** revert is not a menu toggle — say so explicitly to the user before proceeding, and do not present it as equivalent-effort to the light tier. The council audit that lets the human identify revert candidates lives in the `brainstorming` spec commit message body (not a committed spec section).
 
 ### Step 4: Present Options
+
+**Amendment digest (both variants).** Before the options, read `git -C "$WORKTREE" log <base-branch>..HEAD --grep '^amend:'` and take the `auto-apply` and `granted` records from those commit bodies. Render, then the options:
+
+```
+Amendments auto-applied (N):
+- <title> - <what changed>
+```
+
+Omit the block when N = 0.
 
 **Normal repo and named-branch worktree — present exactly these 4 options:**
 

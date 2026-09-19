@@ -222,6 +222,13 @@ const tokenChecks = [
   ["skills/chase-bug/hotfix.md", 'context: "fresh"', true],
   ["skills/chase-bug/hotfix.md", "fork context", false],
   ["skills/chase-bug/hotfix.md", "git -C <WORKTREE>", true],
+  ["skills/brainstorming/SKILL.md", "reference/amendment-surface.md", true],
+  ["skills/brainstorming/SKILL.md", "Show `git -C <abs worktree path> --no-pager diff -- <spec path>`", false],
+  ["skills/brainstorming/reference/amendment-surface.md", "Mode: amendment-review", true],
+  ["skills/brainstorming/reference/amendment-surface.md", "auto-apply", true],
+  ["skills/brainstorming/reference/amendment-surface.md", "escalate", true],
+  ["agents/spec-council-member.md", "Mode: amendment-review", true],
+  ["skills/finishing-a-development-branch/SKILL.md", "Amendments auto-applied", true],
 ];
 for (const [file, tok, want] of tokenChecks) {
   const has = txt(file).includes(tok);

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Post-approval spec amendments go through a reviewer-first funnel (`skills/brainstorming/reference/amendment-surface.md`): a fresh `spec-council-member` in `Mode: amendment-review` clears evidence-backed factual corrections that touch no human-owned section, a deterministic prefilter sends descopes and acceptance-criteria edits to the human, and escalations render as one readable batch (what / why / example / recommended, real alternatives only) with a one-reply grammar and the standing-grant offer; each batch lands as one `amend:` commit with per-item records. The spec gate offers the grant. `finishing-a-development-branch` runs eligible conformance `accept` gaps through the same funnel before the disposition menu and lists auto-applied amendments above the ship options. `brainstorming/SKILL.md` shrinks; `scripts/ci.mjs` pins the new tokens.
+
 ## v5.12.1 - 2026-09-19
 
 - Fixed: `gauntlet-telemetry-salvage` and `gauntlet-performance` no longer crash with `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` when run from an npm-installed copy - both bins are now committed esbuild bundles (sources in `src/bins/`, rebuild with `npm run build:bins`), guarded by a CI freshness check, bundle pack assertions, and a packed-install smoke test. (#39)

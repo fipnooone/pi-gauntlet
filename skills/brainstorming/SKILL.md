@@ -226,14 +226,14 @@ Rejected: <cluster -> one-line reason>, ...
 
 <unresolved ambiguities; every gap-footer entry from the summary>
 
-Please review. Approve to proceed, tell me what to change in the spec, or say "revert applied council edit <X>" to undo a specific applied edit.
+Please review. Approve to proceed, tell me what to change in the spec, or say "revert applied council edit <X>" to undo a specific applied edit. Reply "auto-apply amends" - every later amend-class change in this flow then applies without review, scope changes included; redraws and the spec gate still stop. "approve, auto-apply amends" does both.
 ```
 
 If you believe the summary needs correcting, do **not** silently rewrite it — re-dispatch the summarizer or note the discrepancy as an adjacent line beneath the verbatim block.
 
 **Revert valve.** "Revert applied council edit X" is a normal change request: revise the spec to undo edit X, re-dispatch the summarizer with a **fresh** temp path (per the re-dispatch rule below), and re-present the gate. This is cheap here - the spec is not yet plan- or code-bearing.
 
-Wait for the user. On a change request (including a revert), revise the spec and re-present — mint a **fresh** temp path for the re-dispatched summarizer (never reuse a prior round's path, so stale content can never be mistaken for the new summary). On approval, proceed immediately to `/skill:writing-plans` with no further prompt — the plan and execution mode are mechanical derivatives, so the only human gate here is spec approval itself. Don't land the spec on `main`; it stays in the worktree and ships in the same squash commit as the implementation.
+Wait for the user. On a change request (including a revert), revise the spec and re-present — mint a **fresh** temp path for the re-dispatched summarizer (never reuse a prior round's path, so stale content can never be mistaken for the new summary). On approval, proceed immediately to `/skill:writing-plans` with no further prompt (a grant given at or before approval - "approve, auto-apply amends", or a standalone "auto-apply amends" reply earlier at this gate - is first quoted in the spec commit body via `git -C <abs worktree path> commit --amend --no-edit -q --trailer "Amend-grant: <the sentence>"`, so the worktree history shows when the grant began) — the plan and execution mode are mechanical derivatives, so the only human gate here is spec approval itself. Don't land the spec on `main`; it stays in the worktree and ships in the same squash commit as the implementation.
 
 Post-approval changes follow [Amending an approved spec](#amending-an-approved-spec).
 
@@ -245,13 +245,11 @@ phase_tracker({ action: "complete", phase: "brainstorm" })
 
 ## Amending an approved spec
 
-Execute this section in place from any later phase. Do not invoke `/skill:brainstorming` (its entry resets both trackers). Worktree, spec commits, and plan survive.
+Execute in place from any later phase; never invoke `/skill:brainstorming` for it (its entry resets both trackers). Worktree, spec commits, and plan survive.
 
-1. Edit the spec. Show `git -C <abs worktree path> --no-pager diff -- <spec path>` and one line of impact (affected plan tasks / waves, or "no plan yet").
-2. Render the diff and impact line. A user instruction in this flow that waives per-diff review for later amends ("auto-apply amends, stop only for redraws", "apply spec fixes without asking") is the approval: quote it in the amendment commit body and continue. Otherwise wait for approval; change request -> revise, re-show. Redraws always wait. A grant never satisfies the spec gate; a grant given with or before spec approval applies to later amends in the same flow; a new brainstorm and a fresh-session resume start with no grant.
-3. No plan yet -> commit the spec; continue. Plan exists -> update affected anchors and tasks: `plan_tracker` `add` for new tasks; anchor-changed completed tasks are reopened as `in_progress` and re-run the task loop (`update` never sets `pending`). A removed task is deleted from the plan; then re-`init` the tracker with `{ name, status }` elements: preserved tasks keep their order and statuses, reopened tasks are `in_progress` in place, every still-`pending` task (including newly added ones, whatever wave label they carry) trails the non-pending ones, removed tasks are the only deletions (the only permitted `init` after handoff; never `clear`). Re-run `plan_check` until it passes, commit spec + plan together; continue. A task reopened while `verify` or `ship` is in progress: `phase_tracker({ action: "skip", phase: "<current>", reason: "amendment reopened Task N" })`, then `phase_tracker({ action: "start", phase: "implement", force: true })`; later phases re-enter with `force: true` and rerun in full.
+Classify first. Redraw test: the change alters the problem statement, adds or removes a component, or moves a component boundary -> redraw. A change inside one component (a persistence mechanism, a worker's HTTP client, dropping a fallback and its task) -> amend. State the call; the user overrides either way.
 
-Redraw test: the diff changes the problem statement, adds or removes a component, or moves a component boundary -> redraw. A change inside one component (a persistence mechanism, a worker's HTTP client, dropping a fallback and its task) -> amend. State the call in the same message as the diff; the user overrides either way.
+Amend -> load `reference/amendment-surface.md` and follow it (unreadable -> stop with a blocking error; never improvise the grammar): it holds items unapplied, reviews them with a fresh `spec-council-member`, renders one readable batch for escalations, applies accepted items, runs the plan/tracker aftermath, and commits once. A user instruction in this flow that waives per-diff review for later amends ("auto-apply amends", "auto-apply amends, stop only for redraws", "apply spec fixes without asking") skips the review; it never satisfies the spec gate, and a new brainstorm or a fresh-session resume starts with no grant. Redraws always stop.
 
 Redraw: keep the worktree and the approved spec file. `plan_tracker({ action: "clear" })`, `phase_tracker({ action: "reset" })`, `phase_tracker({ action: "start", phase: "brainstorm" })`, delete the plan file, resume at checklist step 4 with the approved spec as the draft (steps 2-3 skipped). Spec-writing overwrites it; the full gate follows.
 
@@ -272,7 +270,7 @@ One question at a time, YAGNI, 2-3 approaches, two design rounds, clarify freely
 - Plan before approval; brainstorming invocation for an amend ([owner](#user-review-gate)).
 - Missing predecessor banner; invalid multi-spec split ([owner](#spec-self-review-before-user-review-gate); [owner](#2-scope-check)).
 - Approaches while a contradicted premise remains unresolved ([owner](#3-understand-the-idea)).
-- Waiting after an amend grant; auto-applying a redraw ([owner](#amending-an-approved-spec)).
+- Amend without `reference/amendment-surface.md`; waiting after an amend grant; auto-applying a redraw ([owner](#amending-an-approved-spec)).
 
 ## Project overrides
 

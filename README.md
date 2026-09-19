@@ -63,7 +63,7 @@ flowchart LR
 
 <!-- TODO GIF: a real gauntlet run end to end -->
 
-Everything between gate 1 and gate 2 - task breakdown, implementation, both review passes - runs without you in the loop. Changing an approved spec later is a conditional diff-approval stop (brainstorming's `Amending an approved spec`) - or, under a standing grant, a diff render that continues - not a third numbered gate. That's the mechanism. What follows is the machinery behind it.
+Everything between gate 1 and gate 2 - task breakdown, implementation, both review passes - runs without you in the loop. Changing an approved spec later goes through brainstorming's `Amending an approved spec`: a fresh-context reviewer clears evidence-backed factual corrections on its own, escalations reach you as one readable batch, and only a redraw is a full stop - not a third numbered gate. That's the mechanism. What follows is the machinery behind it.
 
 ## Architecture
 
