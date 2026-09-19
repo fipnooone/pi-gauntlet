@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed: `gauntlet-telemetry-salvage` and `gauntlet-performance` no longer crash with `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` when run from an npm-installed copy - both bins are now committed esbuild bundles (sources in `src/bins/`, rebuild with `npm run build:bins`), guarded by a CI freshness check, bundle pack assertions, and a packed-install smoke test. (#39)
+
 ## v5.12.0 - 2026-09-19
 
 - New human-only `/skill:gauntlet-performance` and parse-only `gauntlet-performance` bin: the CLI digests committed telemetry records (current repo, plus `--dir <path>` repos; `--since <version>` narrows; `--json`) into per-run rows and per-version p50/max, and the skill turns the digest into one example-led recommendation, cornerstones, and a three-item menu (render on request, ticket via `shape-ticket`, drill-down). `gauntlet-telemetry-salvage` now stamps a record still `in_progress` with no ship phase as `status: shipped` + `shipped_at` at landing (`present`/`restored ... (marked shipped)`, `unfinished` under `--check`); `finishing-a-development-branch` and `gatekeep-pr` carry the new lines. The gh-37 record on this repo is backfilled to `shipped`. (#35)

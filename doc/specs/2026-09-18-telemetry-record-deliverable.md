@@ -1,5 +1,7 @@
 # Telemetry record is a deliverable: salvage script for finish and PR gate
 
+> **Superseded by:** [doc/specs/2026-09-19-gh-39-installed-bins-ship-js.md](./2026-09-19-gh-39-installed-bins-ship-js.md) - the salvage bin's "plain .mjs importing .ts helpers" implementation convention and its pack/test assertions only
+
 **Goal:** Make the gauntlet telemetry record (`<telemetry.dir>/<spec path with .md -> .yaml>`) a first-class deliverable that ships in the squash beside the spec, and give every landing path - finishing Option 1 (squash-merge), finishing Option 2 (push and PR), and gatekeep-pr's pre-merge step - one shared script, `bin/gauntlet-telemetry-salvage.mjs`, that detects a stripped record and restores it automatically from the last checkpoint commit, never stopping the flow.
 
 Ticket: none (free-text origin, triaged by `/skill:chase-bug` in-session). Consumes the telemetry contract from `doc/specs/2026-09-17-gh-33-run-telemetry-recorder.md` (record path, checkpoint commits) and keeps the index consumer contract of `doc/specs/2026-09-17-gh-34-spec-search-index.md` unchanged.

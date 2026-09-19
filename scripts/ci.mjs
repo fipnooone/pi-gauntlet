@@ -303,6 +303,18 @@ for (const f of walk(R("extensions")).filter((f) => f.endsWith(".ts"))) {
 }
 ok("extensions parse clean (incl. lib/)");
 
+// ---- bin bundles: rebuild + freshness (gh-39) -----------------------------
+try {
+  execFileSync(process.execPath, [R("scripts/build-bins.mjs")], { stdio: "pipe" });
+} catch (e) {
+  fail(`bin bundle build failed (run npm install first - esbuild is a devDependency):\n    ${String(e.stderr || e).split("\n").slice(0, 10).join("\n    ")}`);
+}
+{
+  const dirty = execFileSync("git", ["status", "--porcelain", "--", "bin/"], { cwd: root, encoding: "utf8" }).trim();
+  if (dirty) fail(`bin/ bundles are stale - run \`npm run build:bins\` and commit the result:\n    ${dirty.split("\n").join("\n    ")}`);
+  else ok("bin bundles fresh");
+}
+
 // ---- resolver unit tests ---------------------------------------------------
 try {
   execFileSync(
@@ -474,9 +486,30 @@ try {
   if (!packed.some((f) => f.startsWith("agents/"))) fail("npm pack: no agents/ in tarball");
   if (packed.some((f) => f.startsWith("doc/"))) fail("npm pack: doc/ leaked into tarball");
   if (packed.some((f) => f.startsWith(".claude-plugin/"))) fail("npm pack: .claude-plugin/ leaked into tarball (Claude Code marketplace is source-only)");
-  ok(`npm pack: ${packed.length} files, agents/ + bin/*.mjs and their extension imports present, no doc/ leak`);
+  if (packed.some((f) => f.startsWith("src/"))) fail("npm pack: src/ leaked into tarball (bin sources are not shipped)");
+  ok(`npm pack: ${packed.length} files, agents/ + bin/*.mjs and Pi extension helpers present, no doc/ leak`);
 } catch (e) {
   fail(`npm pack failed: ${String(e.stderr || e).split("\n")[0]}`);
+}
+
+// ---- bin bundles: no runtime .ts imports, shebang intact (gh-39) -----------
+for (const b of ["bin/gauntlet-telemetry-salvage.mjs", "bin/gauntlet-performance.mjs"]) {
+  const firstLine = readFileSync(R(b), "utf8").split("\n", 1)[0];
+  if (firstLine !== "#!/usr/bin/env node") fail(`${b}: first line must be #!/usr/bin/env node`);
+}
+for (const f of walk(R("bin"))) {
+  const rel = f.replace(root + "/", "");
+  const m = readFileSync(f, "utf8").match(/(?:from\s*|import\s*(?:\(\s*)?)["']\.{1,2}\/[^"']*\.ts["']/);
+  if (m) fail(`${rel}: relative .ts import ${JSON.stringify(m[0])} - bins must bundle their helper graph (npm run build:bins)`);
+}
+ok("bin bundles self-contained (no relative .ts imports), shebangs intact");
+
+// ---- packed-install smoke (gh-39) -----------------------------------------
+try {
+  execFileSync(process.execPath, [R("scripts/packed-install-smoke.test.mjs")], { stdio: "pipe" });
+  ok("packed-install smoke passes (both bins run from a scratch node_modules/pi-gauntlet)");
+} catch (e) {
+  fail(`packed-install smoke failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
 }
 
 // ---- report ----------------------------------------------------------------

@@ -58,9 +58,13 @@
   "scripts": {
     "postinstall": "node ./bin/install-agents.mjs",
     "link-agents": "node ./bin/install-agents.mjs",
+    "build:bins": "node scripts/build-bins.mjs",
     "test": "node scripts/ci.mjs"
   },
   "dependencies": {
     "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }
