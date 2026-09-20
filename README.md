@@ -79,11 +79,11 @@ pi-gauntlet is **opinionated**: every non-trivial change is *meant* to ride this
 
 ## Handoff and resume
 
-`/skill:gauntlet-handoff` and `/skill:gauntlet-resume` are a pair: cohort's `handoff` skill writes the six flow-agnostic headings, gauntlet-handoff appends `## Process state`, and gauntlet-resume reads the whole brief back. Both gauntlet skills read one grammar file, `skills/gauntlet-resume/reference/brief-contract.md`; the repo validator (`scripts/ci.mjs`) fails if a grammar line appears anywhere else under `skills/`. Requires the pi-cohort release that ships [pi-cohort #18](https://github.com/jjuraszek/pi-cohort/issues/18) (the `handoff` skill); on an older pi-cohort, gauntlet-handoff stops before writing.
+`/skill:gauntlet-handoff` and `/skill:gauntlet-resume` are a pair: cohort's `handoff` skill writes the six flow-agnostic headings, gauntlet-handoff appends `## Process state`, and gauntlet-resume reads the whole brief back. Both gauntlet skills read one grammar file, `skills/gauntlet-resume/reference/brief-contract.md`; the repo validator (`scripts/ci.mjs`) fails if a grammar line appears anywhere else under `skills/`. Requires pi-cohort >= 7.1.0 (the `handoff` skill, [pi-cohort #18](https://github.com/jjuraszek/pi-cohort/issues/18)); on an older pi-cohort, gauntlet-handoff stops before writing.
 
 ### Smoke walkthrough (release-gated)
 
-Run by a human against the pi-cohort release that ships #18, before a pi-gauntlet release claims the pair works; record the outcome in the release commit body.
+Run by a human against pi-cohort >= 7.1.0, before a pi-gauntlet release claims the pair works; record the outcome in the release commit body.
 
 1. Implement phase with tasks `complete`/`in_progress`/`pending` in a `.worktrees/<branch>` flow, session in the primary checkout: `/skill:gauntlet-handoff` writes `<tmpdir>/pi-handoff/<branch>.md` with the six core headings then `## Process state` last; a fresh session running `/skill:gauntlet-resume <path>` restores implement with the three statuses and ends `Gate history not restored; re-validating <task> before any stage advance`.
 2. Plan phase, `No plan active.`: the brief keeps that line and `Active task: none`; resume restores phase-only with no `plan_tracker init`.

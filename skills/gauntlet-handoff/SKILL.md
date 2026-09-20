@@ -34,7 +34,7 @@ loop: tracker state is extension state no subagent can read.
    - `--out` and `--key` both given -> STOP: they are exclusive in cohort's grammar.
    - `--out <path>` -> resolve to an absolute path against the session cwd
      (`node -p "require('path').resolve(process.argv[1])" -- "<path>"`); that is the
-     expected path and the form passed to cohort.
+     form passed to cohort.
    - Otherwise the key is `--key <name>` when given, else derived from the **run
      worktree**: the path a flow skill reported as `Worktree ready at <path>` in this
      transcript (the same evidence cohort's snapshot uses):
@@ -54,19 +54,22 @@ loop: tracker state is extension state no subagent can read.
      `--out` (a default-branch key would collide across flows).
    - A derived key has every `/` replaced by `-` (`hotfix/x` -> `hotfix-x`) so the file
      lands flat in the default directory. A human-given `--key` is passed verbatim.
-   - Expected path = `<tmpdir>/pi-handoff/<key>.md`, `<tmpdir>` from
-     `node -p "require('os').tmpdir()"`. This is the one place this package restates
-     cohort's default-path rule; step 3 verifies it.
-2. **Invoke cohort.** `/skill:handoff --out <absolute path>` or `/skill:handoff --key <key>`,
-   exactly as resolved in step 1. The skill must be present in the session skill list
-   under `name: handoff`. Absent -> STOP: "cohort `handoff` skill not in the session
-   skill list - install or upgrade pi-cohort to the release that ships pi-cohort #18".
-   No version lookup, no fallback to the `/handoff` prompt.
-3. **Verify the file.** Expected path missing, or line 1 not starting `# Handoff:` ->
-   STOP with the expected path.
+   - With `--key`, cohort writes `<tmpdir>/pi-handoff/<key>.md`, `<tmpdir>` from
+     `node -p "require('os').tmpdir()"`; the authoritative path is the one cohort
+     reports in step 2.
+2. **Run cohort's handoff procedure.** A skill cannot expand `/skill:handoff` (pi expands
+   skill commands on typed input only). Find `handoff` in the session skill list, `Read`
+   its `SKILL.md` at the location listed there, and follow its procedure with the output
+   option resolved in step 1 - the brief's core (six headings, ending at `## Skills loaded`)
+   is cohort's to write, by cohort's rules. Absent from the skill list -> STOP: "cohort
+   `handoff` skill not in the session skill list - install or upgrade to pi-cohort >= 7.1.0".
+   No fallback to the `/handoff` prompt.
+3. **Take the path from the report.** Cohort's procedure ends with `Handoff written: <abs
+   path>` or `Handoff not written: <reason>`. `Handoff not written` -> STOP with that reason.
+   Otherwise that path is the brief; line 1 not starting `# Handoff:` -> STOP with the path.
 4. **Refuse a double section.** The file already has a line matching
    `^## Process state\s*$` -> STOP: "the installed pi-cohort still writes process state
-   itself - upgrade to the release that ships #18".
+   itself - upgrade to pi-cohort >= 7.1.0".
 5. **Hotfix exclusion.** `skills/chase-bug/hotfix.md` is in this session's context ->
    append nothing; report a plain hotfix handoff and go to step 7. Checked before the
    trackers: chase-bug never touches tracker state, and a stale armed flow appended here
@@ -78,7 +81,7 @@ loop: tracker state is extension state no subagent can read.
      `reference/brief-contract.md` lays it out: both status outputs verbatim
      (`No plan active.` verbatim when there is no plan), the active-task line naming
      the first `→` task else `none`, the gate-history line. Append with a single
-     `cat >> "<expected path>" <<'EOF' ... EOF` whose body is that block.
+     `cat >> "<brief path>" <<'EOF' ... EOF` whose body is that block.
    - Re-read the file tail and confirm it ends with the gate-history line from the
      contract and nothing after.
 7. **Report.** Print the path and `/skill:gauntlet-resume <path>`. When a section was
@@ -91,8 +94,9 @@ loop: tracker state is extension state no subagent can read.
 
 ## Red flags - STOP
 
-- Writing the brief yourself instead of invoking `/skill:handoff` (the core headings are
-  cohort's; this skill appends one section).
+- Writing the brief's core yourself instead of following cohort's `handoff` procedure (the
+  six core headings are cohort's; this skill appends one section).
+- Recomputing the brief path instead of taking it from `Handoff written:`.
 - Restating the section layout here instead of reading `reference/brief-contract.md`.
 - Appending when step 4 or step 5 fired.
 - Deriving the key from the primary checkout's branch while a run worktree exists.

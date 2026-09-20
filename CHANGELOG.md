@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- gauntlet-handoff follows the shipped pi-cohort 7.1.0 `handoff` skill: a skill cannot expand `/skill:handoff`, so step 2 reads cohort's `skills/handoff/SKILL.md` from the session skill list and follows its procedure; the brief path comes from cohort's `Handoff written:` report line (`Handoff not written:` is a STOP) instead of being recomputed; the minimum is stated as pi-cohort >= 7.1.0 in README and the brief contract. (#40)
+
 ## v5.16.0 - 2026-09-20
 
 - Skills never name a provider or model: `subagent-driven-development` drops its `## Model Selection` tier table for a one-place `## Model` rule (a dispatch's `model:` is omitted, or carries a `gauntlet_setting` value, a user-named model, or the main loop's own string); `doc/configuration.md` gains `### Dispatch model precedence`; `scripts/model-literal-lint.mjs` bans provider/model literals in `skills/`, `agents/`, `extensions/` from `scripts/ci.mjs`. `writing-skills` widens its trigger to personas and prompt templates and adds `## Authoring rules` (imperative voice, low conditionality, minimal diff, oversized-skill extraction); AGENTS core `v6` makes it binding for every skill, persona, and prompt edit. `shape-ticket` and `conformance-check.md` name the main-loop-string provenance explicitly. (#42)

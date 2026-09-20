@@ -2,7 +2,7 @@
 
 Consumed by `gauntlet-resume/SKILL.md` (consumer) and `gauntlet-handoff/SKILL.md`
 (producer). Grammar lives only here; both skills cite this file and inline none of it
-(`scripts/ci.mjs` drift lint). Coupled to pi-cohort's `handoff` skill (pi-cohort #18)
+(`scripts/ci.mjs` drift lint). Coupled to pi-cohort's `handoff` skill (pi-cohort >= 7.1.0, #18)
 for exactly six headings - `# Handoff:`, `## Intent`, `## Repo state`, `## Decisions`,
 `## Open questions`, `## Skills loaded` - and the `## Repo state` fields. `## Process
 state` grammar and its consumer rules are owned here. Cohort drift is reconciled here
