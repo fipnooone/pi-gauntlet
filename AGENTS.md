@@ -2,7 +2,7 @@
 
 Workflow skills, agent personas, and extensions for the pi coding agent, published to npm as `pi-gauntlet` (`pi install npm:pi-gauntlet`). Generic by design: project-specific content lives in consumer repos via the gauntlet overrides file (`.pi/gauntlet-overrides.md`, or `gauntlet-overrides.md` / `doc/gauntlet-overrides.md` at the repo root; first found wins).
 
-<!-- agents-core:begin v5 - shared across pi-quiver/pi-cohort/pi-gauntlet/pi-condense. Edit AGENTS.core.md, then: node scripts/check-agents-core.mjs --fix -->
+<!-- agents-core:begin v6 - shared across pi-quiver/pi-cohort/pi-gauntlet/pi-condense. Edit AGENTS.core.md, then: node scripts/check-agents-core.mjs --fix -->
 ## Ground Truth Before Reasoning
 
 User instructions outrank skill and AGENTS.md guidance; on conflict, follow the user. Configured gates (design approval, ship verification) still run; a user instruction that already names the gated action satisfies its confirmation.
@@ -47,12 +47,13 @@ Human-read rules:
 - **Docs are a current contract, present tense.** No "upcoming"/"pending" in a current-state guide - planned work lives in `doc/specs/`, `doc/plans/`, or the ticket; history lives in `CHANGELOG.md` and commit bodies, never in AGENTS.md or a guide. Doc updates ride with the commit that makes them stale. Editing a doc puts the smallest unit you touch - bullet, row, heading block - in scope: its paths resolve, its commands match the source, its framing is present tense; stale content outside that unit: flag, don't fix.
 - **AGENTS.md is always-on essentials plus routing, not the manual.** Route detail to `doc/` or `README.md` and link it; add an inline pointer only when critical or high-frequency. README and AGENTS.md stay in sync where they overlap.
 - **Markdown tables use compact `|---|` separators.** Never padded columns.
+- **Skill, persona, and prompt edits follow `/skill:writing-skills`** - any size, including one-line rewordings; its authoring rules (imperative voice, low conditionality, minimal diff, oversized-skill extraction) bind the edit.
 
 ## Ticket convention
 
 Creating a ticket or repairing its title/body/metadata happens only via `/skill:shape-ticket` - it enforces the Context -> Problem -> Idea -> Acceptance Criteria template, an AC integrity gate, and a cheap council roast applied to the body before the single human-gated write (no roast comments); a user instruction naming the ticket's body counts as that gate. Status transitions and comments are exempt - plain tracker CLI.
 
-<!-- agents-core:end v5 -->
+<!-- agents-core:end v6 -->
 
 ## Part of one platform
 
@@ -73,6 +74,7 @@ An **agent-initiated** write to a human-readable channel (tracker comment, Slack
 - **Personas** in `agents/` are dispatched via pi-cohort; frontmatter is not call-time overridable and a frontmatter pin kills the matching preset `agentOverrides` knob. Read the knobs table before touching frontmatter: [`doc/personas.md`](doc/personas.md#frontmatter-knobs).
 - **Extensions** in `extensions/` read every tunable from `settings.json#piGauntlet.<extensionName>` with a working default, through `extensions/lib/gauntlet-settings*.ts` - never `pi.settings` (`scripts/ci.mjs` enforces). New key -> document in [`doc/configuration.md`](doc/configuration.md).
 - **Claude Code surface** is `.claude-plugin/marketplace.json`: an allowlist of harness-portable skills, excluded from the npm tarball, never read by pi. Widen it only for skills whose bodies carry harness fallbacks.
+- **Skill, persona, and prompt edits** follow `/skill:writing-skills` `## Authoring rules` (imperative voice, low conditionality, minimal diff, oversized-skill extraction). Skills never name a provider or model; `scripts/model-literal-lint.mjs` enforces it from `scripts/ci.mjs` ([`doc/configuration.md`](doc/configuration.md#dispatch-model-precedence)).
 
 ## Change process
 
@@ -82,7 +84,7 @@ Any non-trivial change rides the full gauntlet from `/skill:brainstorming` (work
 
 Bin sources live in `src/bins/`; the shipped `bin/gauntlet-telemetry-salvage.mjs` and `bin/gauntlet-performance.mjs` are committed esbuild bundles. After editing a bin source or anything under `extensions/lib/`, run `npm run build:bins` and commit the regenerated bundles - never hand-edit `bin/*.mjs`. A new bin gets a source in `src/bins/`, an entrypoint in `scripts/build-bins.mjs`, and a `bin` map entry.
 
-`npm test` runs `scripts/ci.mjs`: AGENTS core block == `AGENTS.core.md`, skill/agent/extension lint, stage-skill lint (no `cd`/`--show-toplevel`/'switch into the worktree' in the five stage skills), bin bundle freshness (rebuild + `git status --porcelain -- bin/`), resolver and bin unit tests (incl. `gauntlet-telemetry-salvage` and `gauntlet-performance`), `pi.settings` ban, marketplace assertions, `npm pack` contents, packed-install smoke (both bins from a scratch `node_modules/pi-gauntlet`), and `package.json` version == top `## vX.Y.Z` CHANGELOG heading. CI runs it on every push + PR (`.github/workflows/test.yml`). Local iteration: `pi install -l ~/repos/pi-gauntlet` + `npm run link-agents` ([`doc/install-internals.md`](doc/install-internals.md)).
+`npm test` runs `scripts/ci.mjs`: AGENTS core block == `AGENTS.core.md`, skill/agent/extension lint, stage-skill lint (no `cd`/`--show-toplevel`/'switch into the worktree' in the five stage skills), bin bundle freshness (rebuild + `git status --porcelain -- bin/`), resolver and bin unit tests (incl. `gauntlet-telemetry-salvage` and `gauntlet-performance`), `pi.settings` ban, provider/model literal ban (`model-literal-lint`), marketplace assertions, `npm pack` contents, packed-install smoke (both bins from a scratch `node_modules/pi-gauntlet`), and `package.json` version == top `## vX.Y.Z` CHANGELOG heading. CI runs it on every push + PR (`.github/workflows/test.yml`). Local iteration: `pi install -l ~/repos/pi-gauntlet` + `npm run link-agents` ([`doc/install-internals.md`](doc/install-internals.md)).
 
 ## Release
 

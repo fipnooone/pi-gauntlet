@@ -1,6 +1,6 @@
 ---
 name: writing-skills
-description: Use when creating new skills, editing existing skills, or verifying skills work before deployment
+description: Use when creating, editing, or refactoring any SKILL.md, its reference/ files, an agent persona (`agents/*.md`, `.pi/agents/*.md`), or a prompt template - including one-line edits - or when such a file exceeds 500 lines, gains if/else branching, or drifts from imperative voice.
 ---
 
 > **Related skills:** Test new skills with `/skill:test-driven-development` discipline. Verify they work with `/skill:verification-before-completion`.
@@ -18,6 +18,15 @@ Write a pressure scenario for a subagent, watch it fail (baseline), write the sk
 **Violating the letter of the rules is violating the spirit of the rules.** This cuts off the entire class of "I'm following the spirit" rationalizations agents reach for under pressure — yours and the ones reading the skills you write.
 
 **REQUIRED BACKGROUND:** Read `/skill:test-driven-development` first. This skill applies RED → GREEN → REFACTOR to documentation.
+
+## Authoring rules
+
+These four rules bind the lines an edit adds or changes in any skill, persona, or prompt-template file. Leave pre-existing text alone (minimal diff). Where `reference/anthropic-best-practices.md` differs (its "Conditional workflow pattern"), this section wins.
+
+- **Imperative voice.** Write instructions as commands. Never "should", "consider", "you may want to", "it is recommended".
+- **Low conditionality.** One path per step. Branch only on a runtime fact the agent can observe - a tool result, a file's presence, a settings value - never on the reader's judgment. Two branches are the ceiling; move a third into a table or a `reference/` file.
+- **Minimal diff.** A rule change touches the sentence that owns the rule, not the section. Never restate a rule in a second place; link the owner.
+- **Oversized skill.** A change touching a SKILL.md over 500 lines extracts the concern it touches - or, when that concern is small, the largest self-contained `##` section - into `reference/<topic>.md` or a sibling md, in the same change, before it lands. Keep a one-line "read X now" pointer in the body at the step that needs it.
 
 ## Where Skills Live in Pi
 
@@ -194,7 +203,7 @@ Don't invent capabilities. Don't reference Claude Code's `Task` tool, OpenCode h
 NO SKILL WITHOUT A FAILING TEST FIRST
 ```
 
-Applies to new skills AND edits to existing skills.
+Applies to new skills AND edits to existing skills. The RED-GREEN-REFACTOR baseline binds skill bodies - new skills and behavior-changing edits to SKILL.md or reference files; a wording-only edit to a skill, persona, or prompt template is verified by reading the changed lines back against `## Authoring rules`.
 
 Wrote a skill before testing it? Delete it. Start over.
 Edited a skill without testing? Same violation.
@@ -376,7 +385,7 @@ Use `plan_tracker` to create tasks for each item:
 
 **Pi-specific**
 - [ ] If discipline skill *and* the rule is mechanically detectable at a tool boundary: consider an `extensions/*.ts` hook (high bar — runtime hooks are deliberately slim; only add ones that beat false-positive heuristics)
-- [ ] If skill has >500 lines: split deep content into `reference/<topic>.md` and instruct the agent to read the specific file inline
+- [ ] If skill has >500 lines, or a skill this change touches does: split deep content into `reference/<topic>.md` and instruct the agent to read the specific file inline
 - [ ] Skill location: project-scoped lives under `.pi/skills/`; cross-harness skills shared with Claude Code under `.agents/skills/`; reusable workflow skills belong in a package like `pi-gauntlet`
 - [ ] Update routing: link from `AGENTS.md` if cross-cutting
 
@@ -409,11 +418,11 @@ Labels should carry semantic meaning.
 ## Red Flags — STOP
 
 - Wrote a skill without running a baseline scenario first
-- Edited a skill without re-running the relevant baseline
+- Made a behavior-changing skill edit without re-running the relevant baseline
 - Description starts with "This skill does…" (summary instead of trigger)
 - Code-then-test ordering in the skill body
 - Force-loading other skills with `@`
-- SKILL.md over 500 lines with no `reference/` split
+- SKILL.md over 500 lines, or a skill this change touches over 500 lines, with no `reference/` split
 - Referencing tools that don't exist in pi (Claude Code's `Task`, OpenCode hooks, etc.) for a pi-scope skill
 - About to ship multiple skills in a batch without testing each
 - "I'll test it later" — that means never

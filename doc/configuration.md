@@ -14,7 +14,7 @@ Deep reference for pi-gauntlet's gates. See the [README](../README.md) for the w
 }
 ```
 
-Frontmatter pins `thinking: xhigh` and `defaultContext: fresh` (the gate always runs cold, with max reasoning) and `thinking` is not call-site overridable, so the config supplies only `model`. If `closureReview.model` is unset the dispatch omits `model:` and the gate inherits the parent's model; if the configured model is unreachable it retries once inherited.
+Frontmatter pins `thinking: xhigh` and `defaultContext: fresh` (the gate always runs cold, with max reasoning) and `thinking` is not call-site overridable, so the config supplies only `model`. If `closureReview.model` is unset the dispatch omits `model:` (the `agentOverrides` pin applies, else the main loop); if the configured model is unreachable it retries once with the main loop's own string passed explicitly (see [Dispatch model precedence](#dispatch-model-precedence)).
 
 When `closureReview.model` **is** set, the phase-tracker match-checks call-site injection **inside a brainstorming-entered flow**: a `subagent` dispatch of `conformance-reviewer` that omits `model:` is **blocked at tool-call time** (before it runs) so the gate can never silently degrade to the parent's builder model, and a dispatch whose `model:` **differs** from the configured value gets a non-blocking **warning** appended to the result (drift is surfaced, not blocked). The documented one-retry fallback still works - pass an explicit model and it runs (with a warning if it differs). Outside a brainstorming-entered flow the guard is dormant (an ad-hoc conformance-reviewer dispatch is never blocked); disabling `closureReview.enforce` disables it too.
 
@@ -40,7 +40,7 @@ Independently of `closureReview.model`, inside the same window (brainstorming-en
 ```
 
 - `members` (required) — roster of `provider/model` strings; council size = array length, one critique per model. Empty or absent → the council never runs; brainstorming falls back to a single fresh-`worker` critique (scope + ambiguity, auto-applied).
-- `chair` (optional) — model for the consolidating synthesizer; defaults to the inherited model when omitted.
+- `chair` (optional) — model for the consolidating synthesizer; when omitted the dispatch omits `model:` (the `agentOverrides` pin applies, else the main loop).
 
 Rosters resolve **repo-local first**: a repo's `.pi/settings.json` overrides the preset (whole-object — the first file that defines `specCouncil` wins), otherwise each pi profile (`agent`, `agent.anthropic`, `agent.bedrock`, …) reads its own `settings.json`. List only models the resolving config's providers can reach. The two personas it dispatches — `spec-council-member` and `spec-council-synthesizer` — are model-free; their model is injected per task from this config.
 
@@ -57,6 +57,12 @@ When a review fix loop in `subagent-driven-development` reaches its escalate poi
 ```
 
 Whole-object precedence applies (repo `.pi/settings.json` replaces the preset block). Skills read it via `gauntlet_setting({ key: "escalationLoop" })`, which returns the already-resolved `implModel`.
+
+### Dispatch model precedence
+
+A `subagent` dispatch carries `model:` only with a string resolved at runtime; skill text never supplies a provider or model name. Three provenances: (1) a `gauntlet_setting` role key - `closureReview.model`, `escalationLoop.implModel`, `specCouncil.members[]`, `specCouncil.chair`; (2) an explicit user instruction naming a model for that dispatch; (3) the main loop's own string, read from `$PI_PROVIDER`/`$PI_MODEL`, used where a skill must bypass a persona's frontmatter `thinking` pin for cost or pass an explicit fallback after a configured model is unreachable ([`doc/personas.md`](personas.md) documents this path). When `model:` is omitted, `subagents.agentOverrides.<agent>.model` applies, else the child inherits the main loop. `escalationLoop.implModel` is the exception to omission: it resolves to the main-loop string when unset and is always passed, because omitting it would reuse the implementer pin.
+
+Pin review personas (`code-reviewer`, `spec-reviewer`, `conformance-reviewer`) at least as capable as `implementer`; false negatives in review cost more than the model does.
 
 ## Extensions
 

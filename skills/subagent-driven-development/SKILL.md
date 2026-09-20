@@ -21,7 +21,7 @@ Your context window holds the full plan, prior decisions, and conversation histo
 
 - **No context pollution.** Task N's noise doesn't leak into Task N+1.
 - **Tighter focus.** Subagent reads less, makes fewer cross-task assumptions, ships smaller diffs.
-- **Cheaper at scale.** Smaller models can handle simple subtasks; you only spend top-tier tokens on orchestration and hard problems.
+- **Cheaper at scale.** Operator pins (`subagents.agentOverrides.<agent>.model`) route simple subtasks to smaller models; you spend top-tier tokens on orchestration and hard problems.
 
 You are the **orchestrator**. You read the plan, dispatch, review the review, decide. You do **not** write code yourself.
 
@@ -111,30 +111,13 @@ Every implementer dispatch returns one of:
 
 Implementer prompt templates must instruct subagents to return one of these statuses explicitly.
 
-## Model Selection
+## Model
 
-Pi-subagents accepts a per-task `model` override. Use it.
-
-| Task complexity | Model tier | Use cases |
-|---|---|---|
-| Trivial mechanical change | Cheap | Rename, formatter run, dependency bump, file-move with no edits |
-| Standard implementation | Default | Most plan tasks — feature work with tests, refactor with tests |
-| Hard / novel / large surface | Most capable | New subsystem, complex algorithm, cross-service contract change |
-| Spec review | Default | Reads diff + spec, mechanical comparison |
-| Code-quality review | Most capable | Judgment call on naming, design, complexity |
-| Conformance / closure | Most capable | Whole-deliverable-vs-origin intent gate (`conformance-reviewer`; model from `gauntlet_setting({ key: "closureReview" }).model`, injected call-site) |
-
-```ts
-subagent({
-  agent: "implementer",
-  async: false,
-  cwd: "<abs worktree path>",
-  task: "...",
-  model: "anthropic/claude-haiku-4"   // cheap tier
-})
-```
-
-When in doubt, default. Don't downgrade reviewers — false negatives are expensive.
+- Omit `model:` so the operator's `subagents.agentOverrides.<agent>.model` pin applies, or else the child inherits the main loop.
+- Pass `model:` only a runtime-resolved `gauntlet_setting` value (`closureReview.model`, `escalationLoop.implModel`, `specCouncil.members[]`, `specCouncil.chair`) or a model the user named for that dispatch.
+- Read the main loop's own string from `$PI_PROVIDER`/`$PI_MODEL` with the bash tool only when a skill must bypass a persona's frontmatter `thinking` pin for cost or must pass an explicit fallback after a configured model is unreachable.
+- Omit `model:` when `closureReview.model` or `specCouncil.chair` is `undefined`; pass an `implModel` string verbatim, and stop with a note when `implModel` is `undefined` (Fix-Loop Rounds).
+- Apply suffix edits such as `:low` only to a runtime-resolved string, never to a name the skill wrote; never write a provider or model name, tier tasks by cost, or swap a pinned model for a cheaper or stronger one.
 
 ## Dispatch
 

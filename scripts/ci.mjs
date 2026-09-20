@@ -444,6 +444,24 @@ try {
   else ok("stage skills carry the worktree path by value");
 }
 
+// ---- no provider/model literals in skills, personas, extensions (#42) ------
+try {
+  execFileSync(process.execPath, [R("scripts/model-literal-lint.test.mjs")], { stdio: "pipe" });
+  ok("model-literal lint fixtures pass");
+} catch (e) {
+  fail(`model-literal lint fixtures failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
+}
+{
+  const { lintModelLiterals } = await import("./model-literal-lint.mjs");
+  const hits = lintModelLiterals(root).map((h) => `${h.path}:${h.line}: ${h.text}`);
+  if (hits.length) {
+    fail(
+      hits.join("\n    ") +
+        '\n    Skills never name a provider or model - see doc/configuration.md "Dispatch model precedence".',
+    );
+  } else ok("no provider/model literals in skills, agents, extensions");
+}
+
 // ---- Claude Code marketplace (.claude-plugin/) -------------------------------
 // Guards the gh-11 allowlist: entries must be specific existing skill dirs with
 // valid SKILL.md (existence-checked, not count-hardcoded); scan-leak paths

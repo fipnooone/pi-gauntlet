@@ -45,7 +45,7 @@ The persona ships model-free. Get the model from `gauntlet_setting({ key: "closu
 If `gauntlet_setting` is unavailable, stop and report - never fall back to a manual bash/JSON
 settings merge. Inject the model **call-site** on the dispatch (omit `model:` when it is `undefined` to inherit
 the parent's model) — the same mechanism the spec-council chair uses. If the configured model
-is unreachable, retry once with the inherited model. Point it at the strongest reasoning model
+is unreachable, retry once passing the main loop's own string explicitly (read from `$PI_PROVIDER`/`$PI_MODEL`; the phase-tracker guard blocks an omitted `model:` when `closureReview.model` is set and warns on the difference). Point it at the strongest reasoning model
 the resolved config can reach — this is the last correctness gate. `thinking` stays
 frontmatter-pinned at `xhigh` and is not call-site overridable, so the config supplies only
 `model`.
