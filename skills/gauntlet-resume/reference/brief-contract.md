@@ -1,9 +1,12 @@
-# Handoff brief contract (gauntlet-resume supplementary)
+# Handoff brief contract (gauntlet-resume + gauntlet-handoff supplementary)
 
-Consumed only by `SKILL.md` in this directory. This file is the single concentration
-point for text coupled to pi-cohort's `/handoff` template (`doc/handoff-template.md`
-in pi-cohort; baseline inlined from its `prune-prompts` branch, commit `812de45`).
-Cohort drift is reconciled here and nowhere else.
+Consumed by `gauntlet-resume/SKILL.md` (consumer) and `gauntlet-handoff/SKILL.md`
+(producer). Grammar lives only here; both skills cite this file and inline none of it
+(`scripts/ci.mjs` drift lint). Coupled to pi-cohort's `handoff` skill (pi-cohort #18)
+for exactly six headings - `# Handoff:`, `## Intent`, `## Repo state`, `## Decisions`,
+`## Open questions`, `## Skills loaded` - and the `## Repo state` fields. `## Process
+state` grammar and its consumer rules are owned here. Cohort drift is reconciled here
+and nowhere else.
 
 ## Brief grammar
 
@@ -24,15 +27,47 @@ Headings, fixed order. A consumer keys on headings, never prose.
 | `## Repo state` | one field per line: `toplevel`, `worktree: yes <path>` or `worktree: no`, `branch` (`detached` when none), `HEAD`, `base` (`unknown` when no remote resolves), `dirty: <porcelain>` or `dirty: clean`, `diff-stat` (`unavailable` when base unknown), `test cmd`; any field `unavailable` when its command failed; heading `## Repo state: not a git repo` outside git | always |
 | `## Decisions` | bullets; rejected alternatives marked `rejected:` | always |
 | `## Skills loaded` | frontmatter `name`s; `## Skills loaded: none` when none | always |
-| `## Process state` | `phase_tracker status` then `plan_tracker status` verbatim; `Active task: <name|none>`; the line `Gate history not restored - re-validate before advancing.` | only when both tracker tools exist and a phase is `in_progress` |
+| `## Process state` | `phase_tracker status` then `plan_tracker status` verbatim; `Active task: <name|none>`; the line `Gate history not restored - re-validate before advancing.` | only when a phase is `in_progress` and no hotfix flow is in context |
 
-Consumer rules (cohort): process state absent -> plain handoff (the consumer starts its
+Consumer rules: process state absent -> plain handoff (the consumer starts its
 own process from `## Intent`); present with `No plan active.` -> phase-only, restore no
 plan; loading named skills is the consumer's job.
 
 A brief is any text whose first line starts `# Handoff:` - a file on disk or pasted
 inline. `## Repo state` is matched by prefix: `## Repo state` or
 `## Repo state: not a git repo`.
+
+## Producers
+
+`gauntlet-handoff` is the only writer of `## Process state`; it appends to the file
+cohort's `handoff` skill wrote, which ends at `## Skills loaded`. Layout, byte-exact:
+one blank line, the heading on its own line, a blank line, the `phase_tracker status`
+output verbatim, a blank line, the `plan_tracker status` output verbatim, a blank line,
+`Active task: <name|none>`, then the gate-history line - unfenced, nothing after.
+`Active task` is the first `→` task name, else `none` (also for `No plan active.`).
+
+Example appended block (the fence is documentation; the brief carries no fence):
+
+```text
+
+## Process state
+
+Phases:
+  ⊘ brainstorm (resume: pasted brief)
+  ⊘ plan (resume: pasted brief)
+  → implement(W2)
+  ○ verify
+  ○ ship
+
+Plan: 1/3 done (1 in progress, 1 pending)
+
+  ✓ [0] W1: contract
+  → [1] W2: producer
+  ○ [2] W2: consumer
+
+Active task: W2: producer
+Gate history not restored - re-validate before advancing.
+```
 
 ## Tracker output grammar
 

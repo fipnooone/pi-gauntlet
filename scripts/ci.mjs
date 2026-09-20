@@ -246,6 +246,13 @@ const tokenChecks = [
   ["skills/finishing-a-development-branch/SKILL.md", "## Acceptance criteria", true],
   ["skills/finishing-a-development-branch/SKILL.md", "- deferred: <where>", true],
   ["skills/finishing-a-development-branch/SKILL.md", "When the spec's `## Acceptance criteria` has at least one `venue:` or `deferred:` row", true],
+  // #40 gauntlet-handoff ownership boundary: delegates the core brief to cohort, never copies it
+  ["skills/gauntlet-handoff/SKILL.md", "phase_tracker", true],
+  ["skills/gauntlet-handoff/SKILL.md", "plan_tracker", true],
+  ["skills/gauntlet-handoff/SKILL.md", "reference/brief-contract.md", true],
+  ["skills/gauntlet-handoff/SKILL.md", "/skill:handoff", true],
+  ["skills/gauntlet-handoff/SKILL.md", "node_modules/pi-cohort", false],
+  ["skills/gauntlet-handoff/SKILL.md", ".pi/agent", false],
 ];
 for (const [file, tok, want] of tokenChecks) {
   const has = txt(file).includes(tok);
@@ -317,6 +324,28 @@ if (errors.length === subtractiveErrorsBefore) ok("subtractive review pass token
   if (errors.length === resumeErrorsBefore) ok("gauntlet-resume targets same-repo worktrees by path");
 }
 
+// ---- gauntlet-handoff + brief contract: one grammar file, delegated core (#40) ----
+{
+  const handoffErrorsBefore = errors.length;
+  const { lintBriefGrammar, readSkillFiles, CONTRACT_FILE } = await import("./brief-contract-lint.mjs");
+  const drift = lintBriefGrammar(readSkillFiles(root)).map((f) => `${f.file} [${f.rule}] ${f.text}`);
+  if (drift.length) fail(`brief grammar must live only in ${CONTRACT_FILE}:\n    ` + drift.join("\n    "));
+
+  const handoffSkill = "skills/gauntlet-handoff/SKILL.md";
+  const handoffText = txt(handoffSkill);
+  const coreHeading = handoffText.match(/^## (Intent|Repo state|Decisions|Open questions|Skills loaded)\s*$/m);
+  if (coreHeading) fail(`${handoffSkill}: carries cohort core heading "${coreHeading[0].trim()}" - the skill delegates the core brief, never copies it`);
+
+  // Path discipline: same banned tokens as scripts/stage-skill-lint.mjs (fenced `cd ` at statement
+  // start, `git rev-parse --show-toplevel`, "switch into the worktree" prose) without adding
+  // gauntlet-handoff to STAGE_SKILL_DIRS - it is not a stage skill.
+  const { lintStageSkill } = await import("./stage-skill-lint.mjs");
+  const pathHits = lintStageSkill(handoffText).map((h) => `${handoffSkill}:${h.line} [${h.rule}] ${h.text}`);
+  if (pathHits.length) fail("gauntlet-handoff must carry the worktree path, not cd into it:\n    " + pathHits.join("\n    "));
+
+  if (errors.length === handoffErrorsBefore) ok("gauntlet-handoff/gauntlet-resume share one brief contract; producer delegates the core brief");
+}
+
 // ---- extension syntax (type-stripped parse) --------------------------------
 for (const f of walk(R("extensions")).filter((f) => f.endsWith(".ts"))) {
   try {
@@ -384,6 +413,13 @@ try {
   ok("stage-skill lint fixtures pass");
 } catch (e) {
   fail(`stage-skill lint fixtures failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
+}
+
+try {
+  execFileSync(process.execPath, [R("scripts/brief-contract-lint.test.mjs")], { stdio: "pipe" });
+  ok("brief-contract lint fixtures pass");
+} catch (e) {
+  fail(`brief-contract lint fixtures failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
 }
 
 // ---- no ad-hoc settings reads ----------------------------------------------
@@ -504,6 +540,7 @@ try {
     "extensions/lib/telemetry-paths.ts",
     "extensions/lib/telemetry-ship.ts",
     "extensions/lib/phase-tracker-helpers.ts",
+    "skills/gauntlet-handoff/SKILL.md",
   ]) {
     if (!packed.includes(need)) fail(`npm pack: ${need} missing from tarball (runtime would fail)`);
   }

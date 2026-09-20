@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New human-only `/skill:gauntlet-handoff`: invokes pi-cohort's `handoff` skill (`--out <path>` or `--key <name>`; default key = the run worktree's branch, `/` flattened to `-`, file `<tmpdir>/pi-handoff/<key>.md`) and appends the gauntlet `## Process state` section in the layout fixed by `skills/gauntlet-resume/reference/brief-contract.md` (`## Producers`); stops instead of writing when the skill is absent or the installed cohort still writes that section itself. `/skill:gauntlet-resume` with no arguments lists the briefs under `<tmpdir>/pi-handoff/` for a human pick, and a token that looks like a path is always a brief file (missing -> stop, never a scan). `scripts/ci.mjs` gains a drift lint (`scripts/brief-contract-lint.mjs`): the three process-state grammar lines may appear only in the contract file, both skills must cite it, and gauntlet-handoff may not carry cohort's core headings. Requires pi-cohort >= the release shipping [pi-cohort #18](https://github.com/jjuraszek/pi-cohort/issues/18) (exact version filled at release). (#40)
+
 ## v5.14.0 - 2026-09-20
 
 - Specs carry the ticket's acceptance criteria verbatim in a required `## Acceptance criteria` section, one disposition per row (`in-scope`, `deviates: <why>`, `deferred: <where>`, `venue: <env> - <observation>`; `none - <reason>` when there is no ticket or no ACs). `brainstorming` extracts heading-scoped rows and lints the section's presence, `gatherer` quotes the raw rows, `spec-council-member` flags dropped/reworded rows and invalid deferrals, `conformance-reviewer` and `conformance-check` read the section as origin (`in-scope`/`venue:` rows are requirements, `venue:` observations never block), `writing-plans` tables only `in-scope`/`venue:` rows, and `finishing-a-development-branch` lists `venue:`/`deferred:` rows in the PR body. `scripts/ci.mjs` pins the new tokens. (#41)

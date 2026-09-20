@@ -1,6 +1,6 @@
 ---
 name: gauntlet-resume
-description: Use when a human wants to continue an interrupted gauntlet flow in a fresh session - from a pi-cohort handoff brief (file or pasted) or from a bare worktree that already holds a spec. Human-only; the sole resume entry point. Restores phase/plan tracker state through the legal arming sequence, never creates a worktree, never infers approval.
+description: Use when a human wants to continue an interrupted gauntlet flow in a fresh session - from a gauntlet-handoff brief (file, pasted, or picked from the default handoff directory) or from a bare worktree that already holds a spec. Human-only; the sole resume entry point. Restores phase/plan tracker state through the legal arming sequence, never creates a worktree, never infers approval.
 disable-model-invocation: true
 argument-hint: "[<brief-file>] [<worktree-name-or-path>]"
 ---
@@ -12,7 +12,7 @@ argument-hint: "[<brief-file>] [<worktree-name-or-path>]"
 ## Overview
 
 Re-enter an interrupted gauntlet flow in a fresh session. Two inputs: a handoff brief
-produced by pi-cohort's `/handoff` (grammar in `reference/brief-contract.md`), or a bare
+produced by `/skill:gauntlet-handoff` (grammar in `reference/brief-contract.md`), or a bare
 worktree whose spec/plan artifacts are reconstructed into tracker state
 (`reference/reconstruction.md`). Every check runs before any tracker mutation; every
 stop names the offending path, field, or line.
@@ -35,13 +35,20 @@ optional pasted text after the command line.
 
 | Form | Meaning |
 |---|---|
-| `<brief-file>` | readable file whose line 1 starts `# Handoff:` |
+| (no tokens, no pasted text) | discovery: `<tmpdir>` via `node -p "require('os').tmpdir()"`; candidates are the regular files directly under `<tmpdir>/pi-handoff/` ending `.md` (non-recursive) whose line 1 starts `# Handoff:`; sorted by mtime, newest first; displayed one per line as `<n>. <title line> - <worktree: field value> - <mtime ISO-8601>` with `worktree: unavailable` when the field is absent; the human picks `<n>` (a single candidate is still confirmed); none -> STOP "no handoff briefs found under <tmpdir>/pi-handoff" |
+| `<brief-file>` | a single token that is an absolute path, contains a path separator, or ends in `.md`; used as given, never widened to a scan; missing, unreadable, or line 1 not `# Handoff:` -> STOP with that path |
 | pasted text whose first line starts `# Handoff:` | inline brief (equivalent to a file) |
-| `<worktree>` alone | bare name resolved as `<primary>/.worktrees/<name>`, or an absolute path; must already be a git worktree |
+| `<worktree>` alone | any other single token (no path separator, not ending `.md`): bare name resolved as `<primary>/.worktrees/<name>`; must already be a git worktree. An absolute worktree path is given only in the two-token `<brief> <worktree>` form |
 | `<brief> <worktree>` | brief plus an explicit worktree override (required when the brief's worktree field is `no`/`unavailable`/not a git repo; must equal the brief's worktree after `realpath` otherwise) |
 | anything else | not a resume input - stop with "this is a new idea - run /skill:brainstorming" |
 
 `<primary>` is the checkout owning `.worktrees/`: `dirname "$(git rev-parse --path-format=absolute --git-common-dir)"` run in the session cwd - absolute from any primary subdirectory and from inside a linked worktree (`--show-toplevel` would return the linked worktree there). A bare `<name>` resolves as `<primary>/.worktrees/<name>`. A pasted brief that needs an override uses the file form. This skill never runs `git worktree add`.
+
+Classification runs before anything else: a token that is an absolute path, contains a
+path separator, or ends in `.md` is a `<brief-file>` - never a worktree name, never
+widened to a scan. Any other single token is tried as `<worktree>`. A picked or given
+brief then runs entry checks 1-5 unchanged, so a stale or foreign-repo brief stops there.
+Free-form text still lands on the "anything else" row.
 
 ## Entry checks
 

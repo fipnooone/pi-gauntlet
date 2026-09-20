@@ -100,7 +100,7 @@ Bin sources live in `src/bins/`; the shipped `bin/gauntlet-telemetry-salvage.mjs
 | Symlink vs copy install, local dev install, versioning | [`doc/install-internals.md`](doc/install-internals.md) |
 | pi-gauntlet skill overrides for this repo | [`.pi/gauntlet-overrides.md`](.pi/gauntlet-overrides.md) |
 | Run a release | [`.agents/skills/release/SKILL.md`](.agents/skills/release/SKILL.md) |
-| Resume an interrupted flow in a fresh session | [`skills/gauntlet-resume/SKILL.md`](skills/gauntlet-resume/SKILL.md) (human-only; the sole resume path) |
+| Hand off or resume an interrupted flow across sessions | [`skills/gauntlet-handoff/SKILL.md`](skills/gauntlet-handoff/SKILL.md) (human-only producer) and [`skills/gauntlet-resume/SKILL.md`](skills/gauntlet-resume/SKILL.md) (human-only; the sole resume path); grammar in [`skills/gauntlet-resume/reference/brief-contract.md`](skills/gauntlet-resume/reference/brief-contract.md) |
 | Pi runtime API | `node_modules/@earendil-works/pi-coding-agent` docs (`packages.md`, `skills.md`) |
 | Agent dispatch semantics | pi-cohort `src/agents/agents.ts`, `skills/pi-cohort/SKILL.md` |
 | Change the shared AGENTS core | edit [`AGENTS.core.md`](AGENTS.core.md), `node scripts/check-agents-core.mjs --fix`, copy both files to the siblings, `--fix` there |
