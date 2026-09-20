@@ -74,8 +74,12 @@ Context-builder (conditional):
 > `<initial prompt verbatim>`. Fetch and distill these references:
 > `<detected refs, one per line>`. For each: acceptance criteria, hard constraints,
 > linked discussion that changes scope, and contradictions with the request as
-> stated. Write ONLY the context handoff to your output path; do NOT produce a
-> meta-prompt file. End with an "Open questions that matter for the spec" section.
+> stated. Quote the ticket's acceptance-criteria rows verbatim under their own
+> `## Ticket acceptance criteria (verbatim)` heading before distilling the rest;
+> brainstorming copies these rows unchanged into the spec and the council's
+> `Human input` block. Write ONLY the context handoff to your output path; do NOT
+> produce a meta-prompt file. End with an "Open questions that matter for the spec"
+> section.
 > If a ref is unreadable, say so explicitly and continue.
 
 (The meta-prompt exclusion matters: in chain mode context-builder emits two files —

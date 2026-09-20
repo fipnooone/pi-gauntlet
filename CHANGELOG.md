@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Specs carry the ticket's acceptance criteria verbatim in a required `## Acceptance criteria` section, one disposition per row (`in-scope`, `deviates: <why>`, `deferred: <where>`, `venue: <env> - <observation>`; `none - <reason>` when there is no ticket or no ACs). `brainstorming` extracts heading-scoped rows and lints the section's presence, `gatherer` quotes the raw rows, `spec-council-member` flags dropped/reworded rows and invalid deferrals, `conformance-reviewer` and `conformance-check` read the section as origin (`in-scope`/`venue:` rows are requirements, `venue:` observations never block), `writing-plans` tables only `in-scope`/`venue:` rows, and `finishing-a-development-branch` lists `venue:`/`deferred:` rows in the PR body. `scripts/ci.mjs` pins the new tokens. (#41)
+
 ## v5.13.0 - 2026-09-19
 
 - Post-approval spec amendments go through a reviewer-first funnel (`skills/brainstorming/reference/amendment-surface.md`): a fresh `spec-council-member` in `Mode: amendment-review` clears evidence-backed factual corrections that touch no human-owned section, a deterministic prefilter sends descopes and acceptance-criteria edits to the human, and escalations render as one readable batch (what / why / example / recommended, real alternatives only) with a one-reply grammar and the standing-grant offer; each batch lands as one `amend:` commit with per-item records. The spec gate offers the grant. `finishing-a-development-branch` runs eligible conformance `accept` gaps through the same funnel before the disposition menu and lists auto-applied amendments above the ship options. `brainstorming/SKILL.md` shrinks; `scripts/ci.mjs` pins the new tokens.

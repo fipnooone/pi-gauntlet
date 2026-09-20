@@ -229,6 +229,23 @@ const tokenChecks = [
   ["skills/brainstorming/reference/amendment-surface.md", "escalate", true],
   ["agents/spec-council-member.md", "Mode: amendment-review", true],
   ["skills/finishing-a-development-branch/SKILL.md", "Amendments auto-applied", true],
+  // #41 ticket ACs carried verbatim into the spec
+  ["skills/brainstorming/SKILL.md", "## Acceptance criteria", true],
+  ["skills/brainstorming/SKILL.md", "**Ticket contract present.**", true],
+  ["skills/brainstorming/SKILL.md", "none - ticket has no acceptance criteria", true],
+  ["skills/brainstorming/SKILL.md", "**Write the section in every spec**, after `## Problem`:", true],
+  ["skills/brainstorming/gatherer.md", "verbatim", true],
+  ["skills/brainstorming/gatherer.md", "Ticket acceptance criteria (verbatim)", true],
+  ["agents/spec-council-member.md", "deferred:", true],
+  ["agents/spec-council-member.md", "operates-without-it", true],
+  ["agents/conformance-reviewer.md", "recorded in spec? yes", true],
+  ["skills/verification-before-completion/reference/conformance-check.md", "The spec's `## Acceptance criteria` section", true],
+  ["skills/verification-before-completion/reference/conformance-check.md", "`in-scope`/`venue:` rows are requirements", true],
+  ["skills/writing-plans/SKILL.md", "deviates:", true],
+  ["skills/writing-plans/SKILL.md", "table only `in-scope` and `venue:` rows", true],
+  ["skills/finishing-a-development-branch/SKILL.md", "## Acceptance criteria", true],
+  ["skills/finishing-a-development-branch/SKILL.md", "- deferred: <where>", true],
+  ["skills/finishing-a-development-branch/SKILL.md", "When the spec's `## Acceptance criteria` has at least one `venue:` or `deferred:` row", true],
 ];
 for (const [file, tok, want] of tokenChecks) {
   const has = txt(file).includes(tok);

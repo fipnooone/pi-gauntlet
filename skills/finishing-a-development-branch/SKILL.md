@@ -231,6 +231,14 @@ EOF
 )")
 ```
 
+When the spec's `## Acceptance criteria` has at least one `venue:` or `deferred:` row, append this block after `## Test Plan`, listing those rows verbatim with their disposition, so the reader knows what `/skill:check-delivery` verifies after deploy and what a follow-up owns. With no such rows the body ends at `## Test Plan`, byte-identical to today. Option 1's squash commit message is unchanged.
+
+```markdown
+## Acceptance criteria
+- [ ] <row text verbatim> - venue: <env> - <observation>
+- [ ] <row text verbatim> - deferred: <where>
+```
+
 **Do NOT clean up worktree** — user needs it alive to iterate on PR feedback.
 
 #### Option 3: Keep As-Is
