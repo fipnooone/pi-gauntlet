@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.14.0 - 2026-09-20
 
 - Specs carry the ticket's acceptance criteria verbatim in a required `## Acceptance criteria` section, one disposition per row (`in-scope`, `deviates: <why>`, `deferred: <where>`, `venue: <env> - <observation>`; `none - <reason>` when there is no ticket or no ACs). `brainstorming` extracts heading-scoped rows and lints the section's presence, `gatherer` quotes the raw rows, `spec-council-member` flags dropped/reworded rows and invalid deferrals, `conformance-reviewer` and `conformance-check` read the section as origin (`in-scope`/`venue:` rows are requirements, `venue:` observations never block), `writing-plans` tables only `in-scope`/`venue:` rows, and `finishing-a-development-branch` lists `venue:`/`deferred:` rows in the PR body. `scripts/ci.mjs` pins the new tokens. (#41)
 
