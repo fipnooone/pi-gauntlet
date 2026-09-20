@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.16.1 - 2026-09-20
 
 - gauntlet-handoff follows the shipped pi-cohort 7.1.0 `handoff` skill: a skill cannot expand `/skill:handoff`, so step 2 reads cohort's `skills/handoff/SKILL.md` from the session skill list and follows its procedure; the brief path comes from cohort's `Handoff written:` report line (`Handoff not written:` is a STOP) instead of being recomputed; the minimum is stated as pi-cohort >= 7.1.0 in README and the brief contract. (#40)
 
