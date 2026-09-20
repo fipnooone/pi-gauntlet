@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.15.0 - 2026-09-20
 
 - New human-only `/skill:gauntlet-handoff`: invokes pi-cohort's `handoff` skill (`--out <path>` or `--key <name>`; default key = the run worktree's branch, `/` flattened to `-`, file `<tmpdir>/pi-handoff/<key>.md`) and appends the gauntlet `## Process state` section in the layout fixed by `skills/gauntlet-resume/reference/brief-contract.md` (`## Producers`); stops instead of writing when the skill is absent or the installed cohort still writes that section itself. `/skill:gauntlet-resume` with no arguments lists the briefs under `<tmpdir>/pi-handoff/` for a human pick, and a token that looks like a path is always a brief file (missing -> stop, never a scan). `scripts/ci.mjs` gains a drift lint (`scripts/brief-contract-lint.mjs`): the three process-state grammar lines may appear only in the contract file, both skills must cite it, and gauntlet-handoff may not carry cohort's core headings. Requires pi-cohort >= the release shipping [pi-cohort #18](https://github.com/jjuraszek/pi-cohort/issues/18) (exact version filled at release). (#40)
 
