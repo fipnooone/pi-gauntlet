@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.16.0 - 2026-09-20
 
 - Skills never name a provider or model: `subagent-driven-development` drops its `## Model Selection` tier table for a one-place `## Model` rule (a dispatch's `model:` is omitted, or carries a `gauntlet_setting` value, a user-named model, or the main loop's own string); `doc/configuration.md` gains `### Dispatch model precedence`; `scripts/model-literal-lint.mjs` bans provider/model literals in `skills/`, `agents/`, `extensions/` from `scripts/ci.mjs`. `writing-skills` widens its trigger to personas and prompt templates and adds `## Authoring rules` (imperative voice, low conditionality, minimal diff, oversized-skill extraction); AGENTS core `v6` makes it binding for every skill, persona, and prompt edit. `shape-ticket` and `conformance-check.md` name the main-loop-string provenance explicitly. (#42)
 
