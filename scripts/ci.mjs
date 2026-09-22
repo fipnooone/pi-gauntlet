@@ -422,6 +422,13 @@ try {
   fail(`brief-contract lint fixtures failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
 }
 
+try {
+  execFileSync(process.execPath, [R("scripts/documentation-impact-context.test.mjs")], { stdio: "pipe" });
+  ok("documentation-impact context contract passes");
+} catch (e) {
+  fail(`documentation-impact context contract failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 20).join("\n    ")}`);
+}
+
 // ---- no ad-hoc settings reads ----------------------------------------------
 {
   const offenders = walk(R("extensions"))
@@ -559,6 +566,7 @@ try {
     "extensions/lib/telemetry-ship.ts",
     "extensions/lib/phase-tracker-helpers.ts",
     "skills/gauntlet-handoff/SKILL.md",
+    "skills/brainstorming/reference/documentation-impact.md",
   ]) {
     if (!packed.includes(need)) fail(`npm pack: ${need} missing from tarball (runtime would fail)`);
   }
