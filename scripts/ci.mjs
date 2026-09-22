@@ -294,7 +294,7 @@ if (!existsSync(R("skills/gauntlet-performance/../../bin/gauntlet-performance.mj
   if (!worktreeFirst.includes("telemetry record")) fail("skills/brainstorming/SKILL.md: Worktree First must name the telemetry record as a deliverable");
   const finishing = txt("skills/finishing-a-development-branch/SKILL.md");
   if (!finishing.includes("gauntlet-telemetry-salvage.mjs")) fail("skills/finishing-a-development-branch/SKILL.md: missing the gauntlet-telemetry-salvage.mjs call");
-  for (const opt of ["#### Option 1: Squash-merge to base", "#### Option 2: Push and Create PR"]) {
+  for (const opt of ["#### Option 1: Push and Create PR", "#### Option 2: Push and Create Draft PR", "#### Option 3: Squash-merge to base"]) {
     const block = finishing.split(opt)[1]?.split(/^#### /m)[0] ?? "";
     if (!block.includes("telemetry record")) fail(`skills/finishing-a-development-branch/SKILL.md: "${opt}" must name the telemetry record`);
   }

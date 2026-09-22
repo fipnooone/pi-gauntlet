@@ -154,7 +154,7 @@ Each step is **one action, 2-5 minutes**:
 
 **Spec:** `<project>/doc/specs/<same-filename-as-this-plan>.md`
 
-**Verification:** `<full verification command set — tests + style + format; a single bundling entrypoint, or the listed individual commands; from the recon report / project overrides>`
+**Verification:** `<full verification command set — tests + style + format; a single bundling entrypoint, or the listed individual commands; from the recon report / project overrides>` - in a repo with per-service verification commands, list the command of every service the change affects (its own files or code it depends on; a repo-wide shared path such as root config, a lockfile, or a shared library affects every dependent service), taking the per-service commands from the overrides file or AGENTS.md when recon reports a single entrypoint
 
 **Ticket:** `<ticket-id>` (omit if none)
 

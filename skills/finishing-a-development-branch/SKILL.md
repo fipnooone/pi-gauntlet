@@ -32,9 +32,11 @@ Then call `phase_tracker({ action: "start", phase: "ship" })`.
 
 ### Step 1: Verify Tests
 
-**Hard verification gate.** Tests/format/lint must pass before presenting any options — including Discard. The user's stated intent to throw the branch away does not change whether the diff is in a verifiable state; verifying first surfaces accidental damage to unrelated code before the branch is gone forever. No exceptions.
+**Hard verification gate.** Tests/format/lint must pass before presenting any options — including Discard. The user's stated intent to throw the branch away does not change whether the diff is in a verifiable state; verifying first surfaces accidental damage to unrelated code before the branch is gone forever. The skip rule below is the only exception.
 
-Run the project's canonical verification target in the worktree: `(cd "$WORKTREE" && <verification command>)`. The exact command lives in the repo's `AGENTS.md` or service-level docs (look for "verification", "CI", or "test" sections). Typical patterns: `make ci`, `npm test`, `pytest`, `cargo test`, `bundle exec rspec`. Cross-cutting changes: run each affected service's target; don't skip any.
+Run the plan header's `**Verification:**` set in the worktree: `(cd "$WORKTREE" && <command>)`. With no plan in this session, run the verification command(s) of the affected services from the gauntlet overrides file or `AGENTS.md` (look for "verification", "CI", or "test" sections).
+
+**Skip rule.** Skip the run when this set passed in the verify phase of this session and the tree is unchanged since apart from the telemetry record: `git -C "$WORKTREE" diff --quiet <commit the run passed on> HEAD -- . ':!<telemetry.dir>'` (`<telemetry.dir>` defaults to `.pi/gauntlet/telemetry`) exits 0 and no edit or write landed outside `<telemetry.dir>` since. Otherwise run it once. Unsure means run.
 
 **Scoping caveat — pre-existing findings.** Some services carry lint findings unrelated to the diff. If verification fails on lines you didn't touch:
 
@@ -48,7 +50,7 @@ Tests failing (<N> failures). Must fix before completing:
 
 [Show failures]
 
-Cannot proceed with Options 1–3 until tests pass.
+Cannot proceed until tests pass.
 ```
 
 Stop. Don't proceed to Step 2.
@@ -59,7 +61,7 @@ No documentation prompt here: Documentation impact is decided at spec time (`/sk
 
 ### Step 2: Detect Environment
 
-Detached HEAD (`git -C "$WORKTREE" symbolic-ref -q HEAD` prints nothing) -> reduced 3-option menu (no merge), no cleanup. Otherwise the standard 4 options.
+Detached HEAD (`git -C "$WORKTREE" symbolic-ref -q HEAD` prints nothing) -> reduced 4-option menu (no merge), no cleanup. Otherwise the standard 5 options.
 
 ### Step 3: Determine Base Branch
 
@@ -144,38 +146,42 @@ Amendments auto-applied (N):
 
 Omit the block when N = 0.
 
-**Normal repo and named-branch worktree — present exactly these 4 options:**
+**Normal repo and named-branch worktree — present exactly these 5 options:**
 
 ```
 Implementation complete. What would you like to do?
 
-1. Squash-merge to <base-branch> (no PR, no surviving branch)
-2. Push and create a Pull Request
-3. Keep the branch as-is (I'll handle it later)
-4. Discard this work
+1. Push and create a Pull Request
+2. Push and create a draft Pull Request
+3. Squash-merge to <base-branch> (no PR, no surviving branch)
+4. Keep the branch as-is (I'll handle it later)
+5. Discard this work
 
 Which option?
 ```
 
-**Detached HEAD — present exactly these 3 options:**
+**Detached HEAD — present exactly these 4 options:**
 
 ```
 Implementation complete. You're on a detached HEAD (externally managed workspace).
 
 1. Push as new branch and create a Pull Request
-2. Keep as-is (I'll handle it later)
-3. Discard this work
+2. Push as new branch and create a draft Pull Request
+3. Keep as-is (I'll handle it later)
+4. Discard this work
 
 Which option?
 ```
+
+Rows 1-2 run the Option 1/2 blocks; row 3 runs the Keep block and row 4 the Discard block.
 
 **Don't add explanation** - keep options concise.
 
 ### Step 5: Execute Choice
 
-#### Strip the plan, keep the record (Options 1 and 2)
+#### Strip the plan, keep the record (Options 1-3)
 
-Run this on the feature branch before either landing path. The spec and its telemetry record (`<telemetry.dir>/<spec path with .md -> .yaml>`, default `.pi/gauntlet/telemetry/doc/specs/<spec>.yaml`) are deliverables and ship in the squash; only the plan is stripped. `<bin>` is `<directory of this skill's SKILL.md>/../../bin`, resolved from the skill's `<location>` in the system prompt.
+Run this on the feature branch before any landing path. The spec and its telemetry record (`<telemetry.dir>/<spec path with .md -> .yaml>`, default `.pi/gauntlet/telemetry/doc/specs/<spec>.yaml`) are deliverables and ship in the squash; only the plan is stripped. `<bin>` is `<directory of this skill's SKILL.md>/../../bin`, resolved from the skill's `<location>` in the system prompt.
 
 ```bash
 # Plans are ephemeral - if one was committed on this branch, remove it before landing.
@@ -190,27 +196,7 @@ node <bin>/gauntlet-telemetry-salvage.mjs --worktree "$WORKTREE" --base <base-br
 
 The salvage prints one line per spec on the branch (`present`, `present <path> (marked shipped)`, `restored <path> from <sha>`, `restored <path> from <sha> (marked shipped)`, `no telemetry run`, `never written`, `restore failed <path>: <reason>`) and always exits 0. `(marked shipped)` means the record was still `in_progress` with no ship phase (the recorder lost its binding) and the salvage committed `status: shipped` + `shipped_at` as one `telemetry:` commit; it rides the squash or push like any branch commit. Print its stdout verbatim in the ship completion message. A `restore failed` line is reported, never retried, and never blocks the ship - the record stays recoverable from the branch ref.
 
-#### Option 1: Squash-merge to base
-
-Run the strip-and-salvage block above first (plan stripped, telemetry record kept), then:
-
-```bash
-git -C "$PRIMARY" checkout <base-branch>
-git -C "$PRIMARY" pull
-git -C "$PRIMARY" merge --squash "$FEATURE"
-git -C "$PRIMARY" commit -m "<imperative summary> (ref <ticket-id>)"
-(cd "$PRIMARY" && <Step 1 command for the service(s) touched>)
-```
-
-The plan was already removed on the branch, so the staged squash tree carries the spec, the telemetry record, and the implementation - never the plan.
-
-The post-squash re-verify is not optional - `git merge --squash` can surface conflict-resolution mistakes the worktree-side run couldn't catch.
-
-Cleanup worktree (Step 6), then, if Step 6 removed the worktree, `git -C "$PRIMARY" branch -D "$FEATURE"`.
-
-**No push. No PR.** The squashed commit stays local on `<base-branch>` unless the user explicitly asks to push.
-
-#### Option 2: Push and Create PR
+#### Option 1: Push and Create PR
 
 Run the strip-and-salvage block above first (plan stripped, telemetry record kept), then:
 
@@ -231,7 +217,7 @@ EOF
 )")
 ```
 
-When the spec's `## Acceptance criteria` has at least one `venue:` or `deferred:` row, append this block after `## Test Plan`, listing those rows verbatim with their disposition, so the reader knows what `/skill:check-delivery` verifies after deploy and what a follow-up owns. With no such rows the body ends at `## Test Plan`, byte-identical to today. Option 1's squash commit message is unchanged.
+When the spec's `## Acceptance criteria` has at least one `venue:` or `deferred:` row, append this block after `## Test Plan`, listing those rows verbatim with their disposition, so the reader knows what `/skill:check-delivery` verifies after deploy and what a follow-up owns. With no such rows the body ends at `## Test Plan`, byte-identical to today. Option 3's squash commit message is unchanged.
 
 ```markdown
 ## Acceptance criteria
@@ -241,13 +227,37 @@ When the spec's `## Acceptance criteria` has at least one `venue:` or `deferred:
 
 **Do NOT clean up worktree** — user needs it alive to iterate on PR feedback.
 
-#### Option 3: Keep As-Is
+#### Option 2: Push and Create Draft PR
+
+Run the strip-and-salvage block above first (plan stripped, telemetry record kept), then Option 1's push and `gh pr create` commands with `--draft` added. The PR body is unchanged. Do not clean up the worktree.
+
+#### Option 3: Squash-merge to base
+
+Run the strip-and-salvage block above first (plan stripped, telemetry record kept), then:
+
+```bash
+git -C "$PRIMARY" checkout <base-branch>
+git -C "$PRIMARY" pull
+git -C "$PRIMARY" merge --squash "$FEATURE"
+git -C "$PRIMARY" commit -m "<imperative summary> (ref <ticket-id>)"
+(cd "$PRIMARY" && <the Step 1 set>)
+```
+
+The plan was already removed on the branch, so the staged squash tree carries the spec, the telemetry record, and the implementation - never the plan.
+
+The post-squash re-verify is not optional - `git merge --squash` can surface conflict-resolution mistakes the worktree-side run couldn't catch.
+
+Cleanup worktree (Step 6), then, if Step 6 removed the worktree, `git -C "$PRIMARY" branch -D "$FEATURE"`.
+
+**No push. No PR.** The squashed commit stays local on `<base-branch>` unless the user explicitly asks to push.
+
+#### Option 4: Keep As-Is
 
 Report: "Keeping branch <name>. Worktree preserved at <path>."
 
 **Don't cleanup worktree.**
 
-#### Option 4: Discard
+#### Option 5: Discard
 
 **Confirm first:**
 ```
@@ -265,7 +275,7 @@ If confirmed: Cleanup worktree (Step 6), then, if Step 6 removed the worktree, `
 
 ### Step 6: Cleanup Workspace
 
-**Only runs for Options 1 and 4.** Options 2 and 3 always preserve the worktree.
+**Only runs for the Squash-merge and Discard options (3 and 5).** The PR, draft PR, and Keep options always preserve the worktree.
 
 **If the worktree was created by a project-native script** (e.g. `script/worktree create`, `bin/worktree`): defer to its destroy command, run against the primary: `"$PRIMARY/script/worktree" destroy "${WORKTREE##*/}"`.
 
@@ -284,10 +294,11 @@ Removal precedes branch deletion in both options; `git branch -d`/`-D` fails whi
 
 | Option | Merge | Push | Keep Worktree | Cleanup Branch | Plan strip + record salvage |
 |---|---|---|---|---|---|
-| 1. Squash-merge locally | yes (squash) | - | - | yes (after Step 6 removal) | yes (guarded, on the branch before squash) |
-| 2. Create PR | - | yes | yes | - | yes (guarded, on the branch before push) |
-| 3. Keep as-is | - | - | yes | - | - |
-| 4. Discard | - | - | - | yes (force, after Step 6 removal) | - |
+| 1. Create PR | - | yes | yes | - | yes (guarded, on the branch before push) |
+| 2. Create draft PR | - | yes | yes | - | yes (guarded, on the branch before push) |
+| 3. Squash-merge locally | yes (squash) | - | - | yes (after Step 6 removal) | yes (guarded, on the branch before squash) |
+| 4. Keep as-is | - | - | yes | - | - |
+| 5. Discard | - | - | - | yes (force, after Step 6 removal) | - |
 
 A host-owned worktree (Step 6 "Otherwise") keeps both the worktree and the branch.
 
@@ -295,15 +306,15 @@ A host-owned worktree (Step 6 "Otherwise") keeps both the worktree and the branc
 
 **Skipping test verification**
 - **Problem:** Merge broken code, create failing PR
-- **Fix:** Always verify tests before offering options
+- **Fix:** Verify, or apply the Step 1 skip rule, before offering options
 
 **Open-ended questions**
 - **Problem:** "What should I do next?" is ambiguous
-- **Fix:** Present exactly 4 structured options (or 3 for detached HEAD)
+- **Fix:** Present exactly 5 structured options (or 4 for detached HEAD)
 
-**Cleaning up worktree for Option 2**
+**Cleaning up worktree for a PR option (1 or 2)**
 - **Problem:** Remove worktree user needs for PR iteration
-- **Fix:** Only cleanup for Options 1 and 4
+- **Fix:** Only cleanup for the Squash-merge and Discard options (3 and 5)
 
 **Deleting branch before removing worktree**
 - **Problem:** `git branch -d` fails because worktree still references the branch
@@ -321,7 +332,7 @@ A host-owned worktree (Step 6 "Otherwise") keeps both the worktree and the branc
 - **Problem:** Accidentally delete work
 - **Fix:** Require typed "discard" confirmation
 
-**Skipping the strip-and-salvage block in Options 1 and 2 (any path that lands on base)**
+**Skipping the strip-and-salvage block in Options 1-3 (any path that lands on base)**
 - **Problem:** Plan docs are ephemeral and shouldn't land on `<base-branch>`; the telemetry record is a deliverable and must. Skipping the block ships the plan, or drops the record the spec index reads.
 - **Fix:** Run the block on `$WORKTREE` before the squash or the push. The plan stays in the branch's git history (`git -C "$PRIMARY" log --all -- doc/plans/...`). Spec and telemetry record stay on `<base-branch>`; plan does not.
 
@@ -331,7 +342,7 @@ A host-owned worktree (Step 6 "Otherwise") keeps both the worktree and the branc
 
 ## Completion
 
-Once the chosen option (Options 1, 2, or 3 — not Discard) is executed successfully, mark the ship phase complete:
+Once the chosen option (Options 1-4 — not Discard) is executed successfully, mark the ship phase complete:
 
 ```
 phase_tracker({ action: "complete", phase: "ship" })
@@ -350,16 +361,16 @@ Once the merge (and any deploy) has landed, `/skill:check-delivery <ticket-ref>`
 - Clean up worktrees you didn't create (provenance check)
 - Run any step without the `<worktree-path>` argument
 - Auto-proceed past an undispositioned carried-open gap
-- Skip the strip-and-salvage block before the Option 1 squash or the Option 2 push
+- Skip the strip-and-salvage block before the Option 3 squash or the Option 1/2 push
 - Delete the telemetry record (`.pi/gauntlet/telemetry/**` or the configured `telemetry.dir`) on any path
 
 **Always:**
-- Verify tests before offering options
+- Verify, or apply the Step 1 skip rule, before offering options
 - Print the `gauntlet-telemetry-salvage.mjs` output verbatim in the ship completion message
 - Derive `$PRIMARY` and `$FEATURE` from `<worktree-path>` before presenting the menu
-- Present exactly 4 options (or 3 for detached HEAD)
-- Get typed confirmation for Option 4
-- Clean up worktree for Options 1 & 4 only
+- Present exactly 5 options (or 4 for detached HEAD)
+- Get typed confirmation for Option 5 (Discard)
+- Clean up worktree for Options 3 & 5 (Squash-merge, Discard) only
 - Target `$PRIMARY` with `git -C` for merge, worktree removal, and branch deletion
 - Run `git -C "$PRIMARY" worktree prune` after removal
 - Surface the closure / conformance verdict as its own section before the options menu
