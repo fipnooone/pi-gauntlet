@@ -294,10 +294,10 @@ if (!existsSync(R("skills/gauntlet-performance/../../bin/gauntlet-performance.mj
     const block = finishing.split(opt)[1]?.split(/^#### /m)[0] ?? "";
     if (!block.includes("telemetry record")) fail(`skills/finishing-a-development-branch/SKILL.md: "${opt}" must name the telemetry record`);
   }
-  const gate = txt("skills/gatekeep-pr/SKILL.md");
+  const gate = txt("skills/gatekeep-pr/reference/post-selection-loop.md");
   const postSelection = gate.split(/^## Post-selection loop/m)[1]?.split(/^## /m)[0] ?? "";
-  if (!postSelection.includes("gauntlet-telemetry-salvage.mjs")) fail("skills/gatekeep-pr/SKILL.md: Post-selection loop must call gauntlet-telemetry-salvage.mjs");
-  if (!/never delete[^\n]*telemetry/.test(postSelection)) fail("skills/gatekeep-pr/SKILL.md: Post-selection loop must forbid deleting the telemetry record");
+  if (!postSelection.includes("gauntlet-telemetry-salvage.mjs")) fail("skills/gatekeep-pr/reference/post-selection-loop.md: Post-selection loop must call gauntlet-telemetry-salvage.mjs");
+  if (!/never delete[^\n]*telemetry/.test(postSelection)) fail("skills/gatekeep-pr/reference/post-selection-loop.md: Post-selection loop must forbid deleting the telemetry record");
 }
 // touched-files + over-spec in the same paragraph of conformance-check.md
 const ccParas = txt("skills/verification-before-completion/reference/conformance-check.md").split(/\n\s*\n/);
