@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.16.2 - 2026-09-22
 
 - gatekeep-pr: `SKILL.md` is a flow-ordered body under 250 lines; the assessment phases, finding IDs and dispositions, consent table and courses, and the post-selection loop move to `skills/gatekeep-pr/reference/{assessment,findings,decision-menu,post-selection-loop}.md`, each rule owned once. The CI telemetry-salvage probe reads `reference/post-selection-loop.md`. (#43)
 
