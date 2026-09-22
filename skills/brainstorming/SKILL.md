@@ -190,10 +190,11 @@ When `verdict` is `"worker"`, dispatch one fresh `worker` that applies the scope
 ```
 subagent({ agent: "worker", context: "fresh", async: false, cwd: "<abs worktree path, from the using-git-worktrees Step 4 report>", task:
   "Problem statement: <the problem the spec addresses + the user's stated intent>.\n" +
-  "Read the spec at <abs path to doc/specs/...>. Edit ONLY that file. Apply two checks and\n" +
-  "fix what you find in place: (1) Scope — does every paragraph serve the goal? Cut filler;\n" +
-  "state out-of-scope explicitly. (2) Ambiguity — is every 'we should' a concrete decision?\n" +
+  "Read the spec at <abs path to doc/specs/...>. Edit ONLY that file.\n" +
   "Documentation guideline: portable citation `reference/documentation-impact.md`; resolved author guideline: <DOCUMENTATION_IMPACT_GUIDELINE>. The resolved path is the author guideline cited by that portable reference, not a document in the consumer repository.\n" +
+  "If a requested read fails, report the error; do not search for or substitute another document. Never copy an absolute package path or guideline content into the spec; this does not prohibit repairing an external reference required by the task.\n" +
+  "Apply two checks and fix what you find in place: (1) Scope — does every paragraph serve the goal? Cut filler;\n" +
+  "state out-of-scope explicitly. (2) Ambiguity — is every 'we should' a concrete decision?\n" +
   "Replace 'we could probably' with 'we will'/'we won't'. Also inline any load-bearing\n" +
   "external reference (ticket AC, commit SHA, doc) already given to you in the problem\n" +
   "statement above; if the spec relies on one not provided here, flag it (do NOT fetch) in\n" +
