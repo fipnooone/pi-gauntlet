@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fixed independent spec reviewers' access to the author documentation guideline while keeping citations portable and preventing guideline details from leaking into specs.
+- Fixed independent spec reviewers' access to the author documentation guideline while keeping citations portable and preventing guideline details from leaking into specs. (#44)
 
 ## v5.16.1 - 2026-09-20
 

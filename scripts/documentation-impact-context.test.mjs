@@ -20,6 +20,9 @@ const contextInstruction = `Documentation guideline: portable citation ${portabl
 const guidelineReadFailure = "If a requested read of the resolved documentation guideline fails, report the error; do not search for or substitute another document.";
 const guidelineNoLeak = "When using the resolved documentation guideline, never copy its absolute package path or content into the spec; this does not prohibit repairing an unrelated external reference required by the task.";
 const retryReuse = "REUSE THE COMPLETE INITIAL TASK VERBATIM, including the documentation guideline mapping, guideline-only read-failure handling, and guideline-only no-leak rule. Only change the permitted retry output path or model.";
+const brainstormingResolution = "Before dispatching the council or worker, resolve `reference/documentation-impact.md` relative to this loaded skill as one absolute `<DOCUMENTATION_IMPACT_GUIDELINE>` path value.";
+const roastingResolution = "Resolve `../brainstorming/reference/documentation-impact.md` relative to this loaded skill as one absolute `<DOCUMENTATION_IMPACT_GUIDELINE>` path value.";
+const amendmentResolution = "Resolve `reference/documentation-impact.md` relative to the loaded brainstorming SKILL directory as one absolute `<DOCUMENTATION_IMPACT_GUIDELINE>` path value before this dispatch.";
 
 const taskBetween = (source, start, end) => source.slice(source.indexOf(start), source.indexOf(end));
 const assertChildTask = (source, name) => {
@@ -47,7 +50,9 @@ const validateContracts = ({ brainstorming, roasting, amendment }) => {
   }
 
   const amendmentDispatch = taskBetween(amendment, "## 3. Reviewer - one dispatch per batch", "Expected reply");
-  expect(amendmentDispatch, "Resolve `reference/documentation-impact.md` relative to the loaded brainstorming SKILL directory as one absolute `<DOCUMENTATION_IMPACT_GUIDELINE>` path value before this dispatch.", "amendment dispatch must resolve the exact reference path from the brainstorming skill directory");
+  expect(brainstorming, brainstormingResolution, "brainstorming must resolve its loaded-skill documentation guideline");
+  expect(roasting, roastingResolution, "roasting must resolve its loaded-skill documentation guideline");
+  expect(amendmentDispatch, amendmentResolution, "amendment dispatch must resolve the exact reference path from the brainstorming skill directory");
   expect(workerTask, "flag it (do NOT fetch)", "worker must retain ordinary external-reference routing");
   expect(guidelineNoLeak, "unrelated external reference", "guideline no-leak rule must preserve unrelated external-reference repair");
   for (const source of [brainstorming, roasting, amendment]) expectAbsent(source, "documentation audit", "ordinary reviews must not become documentation audits");
@@ -59,6 +64,9 @@ const amendment = read(amendmentPath);
 const guideline = read(guidelinePath);
 const ci = read(ciPath);
 validateContracts({ brainstorming, roasting, amendment });
+assert.throws(() => validateContracts({ brainstorming: brainstorming.replace(brainstormingResolution, ""), roasting, amendment }), "removing brainstorming resolution must fail the shared validator");
+assert.throws(() => validateContracts({ brainstorming, roasting: roasting.replace(roastingResolution, ""), amendment }), "removing roasting resolution must fail the shared validator");
+assert.throws(() => validateContracts({ brainstorming, roasting, amendment: amendment.replace(amendmentResolution, "") }), "removing amendment resolution must fail the shared validator");
 assert.throws(() => validateContracts({ brainstorming, roasting: roasting.replace(contextInstruction, ""), amendment }), "removing the mapping must fail the shared validator");
 assert.throws(() => validateContracts({ brainstorming, roasting: roasting.replace(retryReuse, ""), amendment }), "removing retry reuse must fail the shared validator");
 expect(guideline, "- `brainstorming`", "guideline referenced-by list must name brainstorming");
