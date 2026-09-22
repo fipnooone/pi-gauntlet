@@ -19,6 +19,7 @@ const authorMapping = "The resolved path is the author guideline cited by that p
 const contextInstruction = `Documentation guideline: portable citation ${portableCitation}; resolved author guideline: <DOCUMENTATION_IMPACT_GUIDELINE>. ${authorMapping}`;
 const guidelineReadFailure = "If a requested read of the resolved documentation guideline fails, report the error; do not search for or substitute another document.";
 const guidelineNoLeak = "When using the resolved documentation guideline, never copy its absolute package path or content into the spec; this does not prohibit repairing an unrelated external reference required by the task.";
+const workerPortableCitation = "Preserve the spec's portable citation `reference/documentation-impact.md`; do not remove it as redundant or replace it with the resolved absolute path.";
 const retryReuse = "REUSE THE COMPLETE INITIAL TASK VERBATIM, including the documentation guideline mapping, guideline-only read-failure handling, and guideline-only no-leak rule. Only change the permitted retry output path or model.";
 const brainstormingResolution = "Before dispatching the council or worker, resolve `reference/documentation-impact.md` relative to this loaded skill as one absolute `<DOCUMENTATION_IMPACT_GUIDELINE>` path value.";
 const roastingResolution = "Resolve `../brainstorming/reference/documentation-impact.md` relative to this loaded skill as one absolute `<DOCUMENTATION_IMPACT_GUIDELINE>` path value.";
@@ -42,6 +43,7 @@ const validateContracts = ({ brainstorming, roasting, amendment }) => {
   for (const [name, task] of [["initial council-member task", memberTask], ["initial chair task", chairTask], ["worker fallback task", workerTask], ["amendment-review task", amendmentTask]]) {
     assertChildTask(task, name);
   }
+  expect(workerTask, workerPortableCitation, "worker must preserve the spec's portable citation inside the dispatched task");
 
   const retrySection = taskBetween(roasting, "**Targeted retry.**", "**Quorum.**");
   const chairRetries = taskBetween(roasting, "A chair synthesis is usable", "### 3 — Decide and apply");
@@ -68,6 +70,8 @@ assert.throws(() => validateContracts({ brainstorming: brainstorming.replace(bra
 assert.throws(() => validateContracts({ brainstorming, roasting: roasting.replace(roastingResolution, ""), amendment }), "removing roasting resolution must fail the shared validator");
 assert.throws(() => validateContracts({ brainstorming, roasting, amendment: amendment.replace(amendmentResolution, "") }), "removing amendment resolution must fail the shared validator");
 assert.throws(() => validateContracts({ brainstorming, roasting: roasting.replace(contextInstruction, ""), amendment }), "removing the mapping must fail the shared validator");
+assert.throws(() => validateContracts({ brainstorming: brainstorming.replace(workerPortableCitation, ""), roasting, amendment }), "removing the worker portable-citation instruction must fail the shared validator");
+assert.throws(() => validateContracts({ brainstorming: brainstorming.replace(workerPortableCitation, "") + workerPortableCitation, roasting, amendment }), "moving the worker portable-citation instruction out of the dispatched task must fail the shared validator");
 assert.throws(() => validateContracts({ brainstorming, roasting: roasting.replace(retryReuse, ""), amendment }), "removing retry reuse must fail the shared validator");
 expect(guideline, "- `brainstorming`", "guideline referenced-by list must name brainstorming");
 expect(guideline, "- `roasting-the-spec`", "guideline referenced-by list must name roasting-the-spec");

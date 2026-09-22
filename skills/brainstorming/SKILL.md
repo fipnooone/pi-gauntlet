@@ -193,6 +193,7 @@ subagent({ agent: "worker", context: "fresh", async: false, cwd: "<abs worktree 
   "Read the spec at <abs path to doc/specs/...>. Edit ONLY that file.\n" +
   "Documentation guideline: portable citation `reference/documentation-impact.md`; resolved author guideline: <DOCUMENTATION_IMPACT_GUIDELINE>. The resolved path is the author guideline cited by that portable reference, not a document in the consumer repository.\n" +
   "If a requested read of the resolved documentation guideline fails, report the error; do not search for or substitute another document. When using the resolved documentation guideline, never copy its absolute package path or content into the spec; this does not prohibit repairing an unrelated external reference required by the task.\n" +
+  "Preserve the spec's portable citation `reference/documentation-impact.md`; do not remove it as redundant or replace it with the resolved absolute path.\n" +
   "Apply two checks and fix what you find in place: (1) Scope — does every paragraph serve the goal? Cut filler;\n" +
   "state out-of-scope explicitly. (2) Ambiguity — is every 'we should' a concrete decision?\n" +
   "Replace 'we could probably' with 'we will'/'we won't'. Also inline any load-bearing\n" +
