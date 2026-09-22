@@ -227,6 +227,10 @@ const tokenChecks = [
   ["skills/brainstorming/reference/amendment-surface.md", "Mode: amendment-review", true],
   ["skills/brainstorming/reference/amendment-surface.md", "auto-apply", true],
   ["skills/brainstorming/reference/amendment-surface.md", "escalate", true],
+  ["skills/brainstorming/reference/amendment-surface.md", "Reviewer:", true],
+  ["skills/brainstorming/reference/amendment-surface.md", "applying as recommended", true],
+  ["skills/brainstorming/reference/amendment-surface.md", "or: no plan yet", false],
+  ["skills/finishing-a-development-branch/reference/disposition-protocol.md", "Reviewer:", true],
   ["agents/spec-council-member.md", "Mode: amendment-review", true],
   ["skills/finishing-a-development-branch/SKILL.md", "Amendments auto-applied", true],
   // #41 ticket ACs carried verbatim into the spec

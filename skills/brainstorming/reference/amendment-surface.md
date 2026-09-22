@@ -62,18 +62,19 @@ Expected reply - one line per item, nothing else:
 <handle>: auto-apply | escalate - <one-line reason> - probed: <check> - <result>
 ```
 
-Fail closed: a dispatch error, an async handle, a silence-kill, or a missing or malformed line -> that item (every item when the dispatch failed) is `escalate`, and the batch menu carries `reviewer unavailable: <reason>`.
+Fail closed: a dispatch error, an async handle, a silence-kill, or a missing or malformed line -> that item (every item when the dispatch failed) is `escalate`, its `Reviewer:` line `reviewer unavailable: <reason>`.
 
 ## 4. Human batch - one menu
 
-Render only escalated and prefiltered items. Nothing symbol-dense above the fold; each item's `old -> new` sits under `Details`, after the footer.
+Render only escalated and prefiltered items; `<N>` counts them. Nothing symbol-dense above the fold; each item's `old -> new` sits under `Details`, after the footer.
 
 ```
-Spec amendments: <N> need your call.
+Spec amendments: <N> need your call - from <trigger>; applying as recommended <reopens | adds | removes> <task ids | no tasks>; <phase consequence | no phase change>.
 
 * <handle> - <title>: <what>. <why>.
   Example: <before -> after>
-  Impact: <plan tasks/waves affected, or: no plan yet>
+  Reviewer: <one-line reason verbatim | not reviewed - <prefilter rule> | reviewer unavailable: <reason>>
+  Impact: <spec section>: <approved contract> -> <new contract>; ...
   Recommended: <accept | alt-n> (<one-clause why>).
   Alternatives: alt-1 <one line>; alt-2 <one line>
 
@@ -83,6 +84,10 @@ Standing grant: reply "auto-apply amends" - every later amend-class change in th
 Details
 <handle>: <location> - old: <text> -> new: <text>
 ```
+
+`<trigger>` is the step the main loop is running when the batch forms: `the spec review`, `planning Task <n>`, `Task <n> BLOCKED`, `the verify-phase code review (FIX_FIRST <ids>)`, `the finish-gate council-edit revert`, else `the <phase> phase`; `your request` only for an amend the user raised in prose. The plan clause is the section 5 aftermath as `recommended` would land, over reviewer-cleared plus rendered items, read from the plan file and tracker state - call no `plan_tracker`/`phase_tracker` before the reply: any of `reopens <ids>`, `adds <n> task(s)`, `removes <ids>`, comma-joined (`reopens no tasks` when the plan is untouched), then `; restarts implement, then verify` when a reopen lands in `verify`/`ship`, else `; no phase change`.
+
+`Reviewer:` quotes the `<one-line reason>` of the section 3 reply verbatim; the `probed:` half stays in the commit body; a prefiltered item carries `not reviewed - <the rule that prefiltered it>`. `Impact:` restates the design-contract shift from `location` in the reader's words, never quoted spec text, one clause per touched decision, `;`-joined; `(none) -> <new>` for a contract added, `<old> -> (removed)` for a contract removed. `Details` keeps the verbatim `old -> new`.
 
 `Alternatives:` appears only when genuine ones exist; otherwise the item's choices are exactly `accept` and `custom(...)`. Reply grammar: `1` applies every recommendation; `2:` overrides the named handles, omitted handles keep theirs, a handle at most once; `custom(<effect>)` is free text and may redirect anywhere ("keep the spec, fix the parser"). A redirect away from the spec drops the item (still recorded in the batch commit body as `custom(<effect>)`) and returns the finding to its calling loop. Invalid handle or choice -> reprompt for that item only, keep every valid pick, never reopen the gate. Take no action before the reply.
 
@@ -110,7 +115,7 @@ Called from `finishing-a-development-branch` Step 3.5, before the carried-open m
 1. Draft an item (step 1) for each gap with `recommended: accept`, verdict `DRIFTED` or `PARTIAL`, not `UNAUTHORIZED`, whose `origin` is not an acceptance criterion - the `accept-into-spec` edit built from its `origin` + `evidence`. Every other gap skips the funnel and stays a menu row.
 2. Review (step 3), apply and commit (step 5).
 3. Re-audit against the amended spec; regenerate the inventory. Only concerns the re-audit closed drop out; sibling concerns keep their rows.
-4. Render the disposition menu for what remains - escalated items are ordinary rows there, never a second menu. Rows whose recommended disposition edits the spec carry the readable card fields (`what`, `why`, `Example:`) on the bullet, adapted to the disposition bullet grammar. A human-selected spec-changing disposition (`accept-into-spec`, `rescope-into-spec`, state-changing `custom`) is already approved: it applies at the protocol's execute-order step 2, bypasses steps 2-4 of this surface, and is recorded as today (`Gn - <title>: <disposition>`); an auto-applied item is recorded `Gn - <title>: accept-into-spec (auto-applied)`.
+4. Render the disposition menu for what remains - escalated items are ordinary rows there, never a second menu. Rows whose recommended disposition edits the spec carry the readable card fields (`what`, `why`, `Example:`, `Reviewer:`, `Impact:`) on the bullet, adapted to the disposition bullet grammar. A human-selected spec-changing disposition (`accept-into-spec`, `rescope-into-spec`, state-changing `custom`) is already approved: it applies at the protocol's execute-order step 2, bypasses steps 2-4 of this surface, and is recorded as today (`Gn - <title>: <disposition>`); an auto-applied item is recorded `Gn - <title>: accept-into-spec (auto-applied)`.
 
 ## Worked example
 
@@ -130,19 +135,22 @@ Eight synthetic items modelled on one real run. Items 1-5 and 8 reach the review
 The reviewer clears items 1-5; nothing is applied yet. The batch renders items 6-8 (items 1-5 apply together with the accepted ones after the reply):
 
 ```
-Spec amendments: 3 need your call.
+Spec amendments: 3 need your call - from Task 7 BLOCKED; applying as recommended reopens Tasks 4, 6; no phase change.
 
 * scope - ROP feed out of scope: adds an out-of-scope line for the ROP feed to Non-goals. Drops a deliverable you approved.
   Example: regulator feed = NERC filings + ROP announcements -> NERC filings only
-  Impact: Task 4, Wave 2
+  Reviewer: not reviewed - removes approved scope
+  Impact: Non-goals: the ROP feed ships this release -> (removed)
   Recommended: accept (the ROP source has no stable page this release).
 * count - Fewer announcements per fetch: the acceptance criterion drops from at least 3 to at least 1. Lowers the bar you set.
   Example: 3 items per fetch -> 1
-  Impact: Task 6
+  Reviewer: not reviewed - acceptance-criteria location
+  Impact: Acceptance criteria: a fetch yields three or more announcements -> one or more
   Recommended: accept (the captured fixture has one item; the criterion assumed three).
-* bytes - Fixture byte count: the verification line changes from 41,208 to 43,117 bytes. No measurement was cited, so the reviewer could not confirm it.
+* bytes - Fixture byte count: the verification line changes from 41,208 to 43,117 bytes. The verification line would assert a size nobody measured.
   Example: 41,208 bytes -> 43,117 bytes
-  Impact: no plan yet
+  Reviewer: rubric (a) fails - no measurement cited for the new byte count
+  Impact: Verification: the fixture measures 41,208 bytes -> 43,117 bytes
   Recommended: alt-1 (measure first; apply whatever `wc -c` reports).
   Alternatives: alt-1 replace the number with the `wc -c` result
 

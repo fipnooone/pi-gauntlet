@@ -1,5 +1,7 @@
 # Readable, reviewer-filtered amendment gates
 
+> **Superseded by:** [doc/specs/2026-09-22-amend-batch-trigger-reviewer-contract.md](./2026-09-22-amend-batch-trigger-reviewer-contract.md) - "Tier-2 render (human batch)" card fields only
+
 **Goal:** a post-approval spec amendment reaches a human only when a fresh-context reviewer cannot clear it; every amendment a human does see is one plain-language entry in a batched menu with a tiny example, real alternatives when they exist, and one-reply disposition. `skills/brainstorming/SKILL.md` gets shorter, not longer.
 
 Supersedes `doc/specs/2026-09-18-council-grounding-amend-approval.md`, "Standing amend approval" presentation scope only (its grant safety boundary carries over unchanged). Extends #27's per-diff amendment contract (`v5.3.7`) to a batched, reviewer-filtered one; the rationale for narrowing #27's "every amendment stops" is recorded in [Why the calculus changed](#why-the-calculus-changed).

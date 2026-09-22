@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The amendment human batch card carries what the reviewer funnel already knows: the header names the step that raised the batch and the plan consequence of applying as recommended (`from <trigger>; applying as recommended reopens <ids>; <phase consequence>`), each item quotes the reviewer's verdict verbatim on a `Reviewer:` line (`not reviewed - <rule>` for prefiltered items, `reviewer unavailable: <reason>` on a failed dispatch), and `Impact:` states the approved-contract shift per spec section instead of listing plan tasks. The finish-gate disposition bullet mirrors `Reviewer:` and `Impact:`. Supersedes the card fields of `doc/specs/2026-09-19-readable-amendment-gates.md`.
+
 ## v5.16.2 - 2026-09-22
 
 - gatekeep-pr: `SKILL.md` is a flow-ordered body under 250 lines; the assessment phases, finding IDs and dispositions, consent table and courses, and the post-selection loop move to `skills/gatekeep-pr/reference/{assessment,findings,decision-menu,post-selection-loop}.md`, each rule owned once. The CI telemetry-salvage probe reads `reference/post-selection-loop.md`. (#43)
