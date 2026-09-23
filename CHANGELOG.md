@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v5.17.1 - 2026-09-22
 
 - Fix finishing's verification-skip check to inspect the working tree, index, and untracked files outside the configured telemetry directory, rather than comparing commits alone. Require a known clean verified commit; uncertainty or a failed Git check reruns verification. Add executable Git regression tests to CI.
 
