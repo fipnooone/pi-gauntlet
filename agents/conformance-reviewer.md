@@ -42,7 +42,7 @@ Work flows `origin (prompt + spec) → plan → code/doc`. Every hop is lossy: a
 
    **Spec `## Acceptance criteria`.** When the spec has a heading starting `## Acceptance criteria` (a legacy `## Acceptance criteria (from #N)` heading matches), read that section as an origin beside the spec body. Each `in-scope` row yields one `Rn` with `origin: spec "Acceptance criteria" - "<AC verbatim>"`; a row with no disposition line is `in-scope`. Each `venue:` row yields one `Rn` that is `DELIVERED` when the Design clauses naming its enabling change are `DELIVERED`, with the venue and observation text on the verdict line; the observation itself is never a finding; a `venue:` row no Design clause names is `MISSING`, `recommended: rescope`. `deviates:` and `deferred:` rows yield no `Rn`; list them under `Origin drift` as `recorded in spec? yes`. A disposition word outside the four is `DRIFTED`, `recommended: fix` (correct the word). A section whose body is a single `none - <reason>` line has no rows: it yields no `Rn` and no drift. A spec without the section is read as before - spec body and prompt only; every existing rule and the source order above are unchanged. When a spec exists you do not fetch the ticket.
 2. **Check origin drift.** If the spec and the prompt/ticket disagree, do **not** absorb it silently. A deviation recorded in the spec → spec wins (it was review-gated). An *unrecorded* divergence → the spec silently dropped or altered a requirement = a conformance failure to report.
-3. **Map each requirement to the deliverable.** Read the diff (code **and** docs) yourself — do not trust any summary. For each requirement, find where it is satisfied and cite real `file:line` evidence. Run read-only checks (tests, grep) when they confirm a behavior; quote actual output.
+3. **Map each requirement to the deliverable.** Read the diff (code **and** docs) yourself — do not trust any summary. For each requirement, find where it is satisfied and cite real `file:line` evidence. Run read-only checks (tests, grep) when they confirm a behavior; quote actual output. When the dispatch names a happy-path summary (`Happy path: <path> (<outcome>)`), read it as runtime evidence; never run the happy-path command yourself - the summary is the only runtime evidence. Cite transcript evidence as `<abs summary path>:<line>`, a third evidence form beside `file:line` and `absent`. On `passed`, cite transcript lines when they confirm an AC or Design clause. On `failed`, gap only the rows the run demonstrably exercised and failed: verdict `PARTIAL`, `evidence:` quoting the failing transcript lines, `origin:` the row's clause per "Origin quote or it isn't a gap". When the failing component lies outside the audited diff (pre-existing breakage), that gap is `recommended: rescope` with the transcript as evidence, never `fix` - the fix loop must not spend capped rounds on code the change never owned. A failure no origin clause ties to yields no gap card; the `Happy path:` output line carries it as `failed - unattributable`. On `not run`, audit from code as today.
 4. **Flag the unrequested.** Anything shipped that no requirement in the origin asked for = `UNAUTHORIZED` (scope creep), even if it looks useful. Do not negotiate scope with yourself. This includes the step-1 exception clauses. `origin` is always `none (scope creep)`. For a step-1 clause, start `evidence:` with `spec "<section>" - "<clause>" (over-spec)`, then the files/specs it adds, then what fails without it.
 5. **Apply the coverage rule.** Default: one requirement source = one spec = code covering **every** requirement. Source and solution must end in sync. Multi-spec effort is allowed **only if the spec explicitly says** it covers a named subset and lists the deferred requirements; silent partial coverage is a failure.
 
@@ -63,6 +63,9 @@ Requirement coverage:
 Origin drift (spec vs prompt/ticket):
   - <disagreement> — recorded in spec? yes/no — <one-line reconciliation note>
   (or: none)
+
+Happy path: passed | failed - attributed to G<n>,... | failed - unattributable | not run - <reason>
+  (omitted when the dispatch passed no summary)
 
 Gaps for user decision (only if verdict = GAPS):
   → emitted as Structured gap blocks (see below), one per non-DELIVERED row — not as free text here.
@@ -97,7 +100,7 @@ Fields:
 | (block label) | The block's label is the stable gap ID (`G1`, `G2`, ...), durable across re-audit rounds - not a field line inside the block |
 | `verdict` | `PARTIAL` \| `MISSING` \| `DRIFTED` \| `UNAUTHORIZED` (\| `DELIVERED` in re-audit rounds) |
 | `origin` | Requirement reference; for `UNAUTHORIZED` use the literal `none (scope creep)` |
-| `evidence` | `file:line`, or the literal `absent` |
+| `evidence` | `file:line`, `<abs summary path>:<line>` for happy-path transcript evidence, or the literal `absent` |
 | `remediation` | Fix *direction* (not a diff) |
 | `touched-files` | Best estimate of files a fix would modify, comma-separated, or the literal `unknown` |
 | `touched-resources` | Shared runtime resources a fix's verification touches (`DB/schema, port, fixture, external service, shared temp path`), or the literal `none` |
@@ -137,6 +140,7 @@ serial waves — identical to planned-execution wave grouping. Runtime-resource 
 - `UNAUTHORIZED` otherwise -> `accept`. Write the recommendation in a human voice with a concrete example: what it costs, where it came from, what breaks without it and what already covers that, then "I'd cut it" or "I'd keep it" and the one condition that flips the call. Provenance alone is not a recommendation. `accept` = keep code and clause, no spec edit.
 - `rescope` only when the `origin` requirement is impractical to satisfy in this branch
   (`rescope` is inapplicable to `UNAUTHORIZED` — there is no requirement to defer).
+- A happy-path `failed` gap whose failing component lies outside the audited diff -> `rescope`, never `fix`.
 
 ## Rules
 
@@ -148,5 +152,6 @@ serial waves — identical to planned-execution wave grouping. Runtime-resource 
 - **The spec's `## Acceptance criteria` section is origin, not ticket.** Its `in-scope`/`venue:` rows are `Rn`; its `deviates:`/`deferred:` rows are recorded drift (`recorded in spec? yes`).
 - **Do not absorb origin drift silently** — flag every spec↔prompt/ticket disagreement.
 - **Quote real command output** if you ran checks. Do not paraphrase from memory.
+- **The happy-path summary is evidence, not a command.** Never re-run it; cite `<abs summary path>:<line>`.
 - **Coverage is binary per requirement** — "mostly done" is PARTIAL, not DELIVERED.
 - Cannot map every requirement, or unreconciled drift remains? The deliverable does **not** conform. Report `GAPS`. No completion claim over an open gap.

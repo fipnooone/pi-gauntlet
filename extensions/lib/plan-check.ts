@@ -90,6 +90,9 @@ interface Header {
   specPath: string | undefined;
   verificationLine: number | undefined;
   verificationText: string | undefined;
+  happyPathLine: number | undefined;
+  happyPathText: string | undefined;
+  happyPathCommand: string | undefined;
   separatorLine: number | undefined;
 }
 
@@ -123,6 +126,7 @@ function fenceMask(lines: string[]): boolean[] {
 }
 
 const ANCHOR_RE = /\u00a7\s*"([^"]+)"\s*L(\d+)(?:-L(\d+))?/g;
+const HAPPY_PATH_RE = /^(\S.*?) - `([^`]+)`(?: \(~\d+(?:s|m|h)\))?$/;
 
 function parseAnchors(text: string): Anchor[] {
   const anchors: Anchor[] = [];
@@ -151,6 +155,9 @@ function parsePlan(planText: string): ParsedPlan {
   let specPath: string | undefined;
   let verificationLine: number | undefined;
   let verificationText: string | undefined;
+  let happyPathLine: number | undefined;
+  let happyPathText: string | undefined;
+  let happyPathCommand: string | undefined;
   for (let i = 0; i < headerRangeEnd; i++) {
     if (mask[i]) continue;
     const line = lines[i];
@@ -164,6 +171,11 @@ function parsePlan(planText: string): ParsedPlan {
     if (verificationLine === undefined && /^\*\*Verification:\*\*/.test(line)) {
       verificationLine = i + 1;
       verificationText = line.replace(/^\*\*Verification:\*\*/, "").trim();
+    }
+    if (happyPathLine === undefined && /^\*\*Happy path:\*\*/.test(line)) {
+      happyPathLine = i + 1;
+      happyPathText = line.replace(/^\*\*Happy path:\*\*/, "").trim();
+      happyPathCommand = HAPPY_PATH_RE.exec(happyPathText)?.[2];
     }
   }
 
@@ -370,7 +382,7 @@ function parsePlan(planText: string): ParsedPlan {
 
   return {
     lines,
-    header: { specPathLine, specPath, verificationLine, verificationText, separatorLine },
+    header: { specPathLine, specPath, verificationLine, verificationText, happyPathLine, happyPathText, happyPathCommand, separatorLine },
     waves,
     tasks,
     coverageTableFound,
@@ -422,10 +434,15 @@ function commandSegments(cmd: string): string[] {
 }
 
 function headerSegments(parsed: ParsedPlan): string[] {
-  const value = parsed.header.verificationText ?? "";
-  const spans = backtickSpans(value);
-  const parts = spans.length > 0 ? spans : [value];
-  return parts.flatMap((p) => norm(p).split(/\s*(?:&&|\|\||;|,)\s*/)).map((s) => s.trim()).filter(Boolean);
+  const values = [parsed.header.verificationText ?? "", parsed.header.happyPathCommand ?? ""].filter(Boolean);
+  return values
+    .flatMap((value) => {
+      const spans = backtickSpans(value);
+      const parts = spans.length > 0 ? spans : [value];
+      return parts.flatMap((p) => norm(p).split(/\s*(?:&&|\|\||;|,)\s*/));
+    })
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 const RUN_RE = /^\s*(- \[ \] )?Run:\s*(.*)$/;
@@ -491,7 +508,7 @@ function checkTestsBlock(parsed: ParsedPlan, fs: FsPort): PlanCheckFinding[] {
         for (const t of tokens) {
           if (!isAnchor(t) && isBroadening(t)) push(task, b.line, b.text, `broadening selector "${t}" in "${seg}"`);
         }
-        if (header.includes(seg)) push(task, b.line, b.text, `full-suite command in task: "${seg}" equals a header **Verification:** segment`);
+        if (header.includes(seg)) push(task, b.line, b.text, `full-suite command in task: "${seg}" equals a header **Verification:** or **Happy path:** segment`);
       }
     }
   }
@@ -944,6 +961,19 @@ function checkSoloLine(parsed: ParsedPlan): PlanCheckFinding[] {
   return findings;
 }
 
+function checkHappyPathLine(parsed: ParsedPlan): PlanCheckFinding[] {
+  const { happyPathLine, happyPathText, happyPathCommand } = parsed.header;
+  if (happyPathLine === undefined || happyPathCommand !== undefined) return [];
+  return [
+    {
+      check: "header-happy-path",
+      line: happyPathLine,
+      text: parsed.lines[happyPathLine - 1],
+      reason: `malformed **Happy path:** line "${happyPathText ?? ""}" (expected \`<label> - \\\`<command>\\\`\` with optional \` (~<duration>)\`, duration \\d+(s|m|h))`,
+    },
+  ];
+}
+
 function checkHeaderEntrypoint(parsed: ParsedPlan): PlanCheckFinding[] {
   const findings: PlanCheckFinding[] = [];
   if (parsed.header.verificationText === undefined || parsed.header.separatorLine === undefined) {
@@ -959,6 +989,7 @@ function checkHeaderEntrypoint(parsed: ParsedPlan): PlanCheckFinding[] {
   if (!entrypoint) return findings;
 
   const header = headerSegments(parsed);
+  const entrypoints = [entrypoint, parsed.header.happyPathCommand].filter((e): e is string => Boolean(e));
   const executable = new Set<number>();
   for (const task of parsed.tasks) {
     for (const bullet of [...task.tests, ...task.testsVia, ...task.testsNone, ...task.testsMalformed]) {
@@ -993,17 +1024,18 @@ function checkHeaderEntrypoint(parsed: ParsedPlan): PlanCheckFinding[] {
           check: "header-entrypoint",
           line: ln,
           text: line,
-          reason: `Run: segment "${hit}" equals a header **Verification:** segment (full suite belongs to the verify phase)`,
+          reason: `Run: segment "${hit}" equals a header **Verification:** or **Happy path:** segment (full suite belongs to the verify phase)`,
         });
       }
       continue;
     }
-    if (line.includes(entrypoint)) {
+    const hitEntry = entrypoints.find((e) => line.includes(e));
+    if (hitEntry !== undefined) {
       findings.push({
         check: "header-entrypoint",
         line: ln,
         text: line,
-        reason: `header entrypoint "${entrypoint}" also appears outside the header (must be header-only)`,
+        reason: `header entrypoint "${hitEntry}" also appears outside the header (must be header-only)`,
       });
     }
   }
@@ -1060,6 +1092,7 @@ export function checkPlan(planText: string, specText: string, fs: FsPort): PlanC
     findings.push(...checkWaveFileDisjointness(parsed, fs));
     findings.push(...checkSoloLine(parsed));
     findings.push(...checkHeaderEntrypoint(parsed));
+    findings.push(...checkHappyPathLine(parsed));
     findings.push(...checkWaiverLiteral(parsed));
     return findings;
   } catch (err) {

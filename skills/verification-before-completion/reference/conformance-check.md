@@ -35,6 +35,7 @@ pass in:
 - The **spec** (path).
 - The **original prompt** (verbatim — it holds inline requirements + any ticket ref).
 - The **diff** to audit (code + docs).
+- The **happy-path summary**, when `subagent-driven-development` step 3 ran one: `Happy path: <abs path to $HP_DIR/summary.txt> (<outcome>)`, `<outcome>` being the outcome line without its `happy-path: ` prefix. Omitted when no run happened; the ad-hoc path in `finishing-a-development-branch` (no plan, no header) never runs one and never passes this input.
 
 Dispatch it as its **own** call — do not fold the conformance check into the
 whole-PR code-quality review. Fusing the two subordinates intent-coverage to a
@@ -164,7 +165,7 @@ Per round:
    one-task `tasks` wave (never a lone `agent: "implementer"`) and counts as a
    wave against `maxFixRounds`. A `BLOCKED`/`NEEDS_CONTEXT` return surfaces to the user.
 4. **Scoped tests** on the integrated tree: run the round's `SCOPED_TEST_COMMANDS` union as `(cd "<conformance-worktree>" && <command>)`. A failure re-enters the failure-handling rules above.
-5. **Re-audit**: foreground re-dispatch `conformance-reviewer` with `async: false`, `cwd` = the conformance worktree, over the fixes **plus** the
+5. **Re-audit**: Happy-path re-run first, when the prior audit received a happy-path input: if `$HP_DIR` no longer exists (finish-time `fix-now` in a resumed session), re-derive the row per step 3.1 from the overrides table, then re-run the step-3 procedure when `git -C "<worktree>" diff --name-only <audited-base>..HEAD` contains a path inside that row's `Paths` or an open gap's `evidence:` cites the summary path, else pass `not run - no prior transcript`. Otherwise re-run the step-3 procedure into a fresh `$HP_DIR` when either (a) `git -C "<worktree>" diff --name-only <head from current summary.txt>..HEAD` contains a path inside the current row's `Paths` (the summary's `head:` line is the diff base, so changes from skipped rounds accumulate into the next comparison); (b) an open gap's `evidence:` cites the summary path. Otherwise pass the previous summary unchanged. When the re-run's outcome differs from the previous one, extend this re-audit's scope to every row whose `evidence:` cites the summary. Rounds touching only paths outside every row never re-run. Then foreground re-dispatch `conformance-reviewer` with `async: false`, `cwd` = the conformance worktree, over the fixes **plus** the
    regression guard (any prior-`DELIVERED` requirement whose `evidence` file
    the fix diff touched). Pass the full prior conformance report (every row,
    including DELIVERED rows and their `evidence` `file:line`) and the round's
@@ -352,18 +353,20 @@ carried-open `fix` state is valid closure inventory, not escalation.
 ### Handoff sentinel and freshness anchor - every handoff
 
 Every `## Closure / conformance` block - a `CONFORMS` no-card handoff and a
-carried-open GAPS handoff alike - **opens with a two-line sentinel** that lets
+carried-open GAPS handoff alike - **opens with a sentinel of two lines (three
+when a happy-path run happened)** that lets
 the finish gate re-verify freshness after context pruning, with no session
 history:
 
 ```text
 status: CONFORMS (0 open)      # or: status: GAPS (N open)
 audited-base: <full HEAD SHA at audit time>
+happy-path: passed | failed - attributed to G<n>,... | failed - unattributable | not run - <reason>
 ```
 
 `N` = count of open concerns (decision units), matching the number of emitted
 concern cards. Record `audited-base` as the full 40-char HEAD SHA at audit time;
-never abbreviate. This block is the **single source** for the freshness rule;
+never abbreviate. The `happy-path:` line is present exactly when a happy-path run happened, carrying the value of the reviewer's `Happy path:` output line of the final audit (the text after `Happy path: `; the transcript the final verdict was audited against). It is not a concern card: `N` and the card count ignore it. `finishing-a-development-branch` Step 3.5 renders it as one informational line. This block is the **single source** for the freshness rule;
 `finishing-a-development-branch` links here rather than restating it.
 
 **Freshness rule.** The audit-input rule requires deliverables committed before
@@ -378,7 +381,7 @@ git -C "$ROOT" status --porcelain --untracked-files=all # new/untracked delivera
 ```
 
 Any output from either command, any doubt, a missing/mismatched sentinel, or any
-closure block not opening with the two-line sentinel above (e.g. a legacy
+closure block not opening with the sentinel above (e.g. a legacy
 `Gn: PARTIAL - recommended: ...` row) triggers a fresh audit - never infer
 `CONFORMS` from the absence of cards. This is a lightweight freshness check (two
 git commands, no hashing or identity fields).

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Projects can declare end-to-end happy-path commands in a `## Happy path` overrides table (`Row | Paths | Command | Timeout`, contract in `README.md`); `writing-plans` selects the row covering the plan's files into an optional `**Happy path:**` header line (`plan_check` validates it and bans the command from tasks and wave prose), `subagent-driven-development` runs it once in the verify phase between code review and the conformance audit under `timeout -k 30s` via `bash -c`, and the `conformance-reviewer` reads the bounded transcript as runtime evidence (`passed` / `failed` / `not run`; a failure in code the change never touched is `rescope`, never `fix`). Fix rounds re-run it only when the round touches the row's paths or an open gap cites the transcript; the closure sentinel and the finish render carry a `happy-path:` line. Optional end to end - no section, no change.
+
 ## v5.17.1 - 2026-09-22
 
 - Fix finishing's verification-skip check to inspect the working tree, index, and untracked files outside the configured telemetry directory, rather than comparing commits alone. Require a known clean verified commit; uncertainty or a failed Git check reruns verification. Add executable Git regression tests to CI.
