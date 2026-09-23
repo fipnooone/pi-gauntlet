@@ -4,6 +4,26 @@
 
 - Review dispatch tasks now carry the installed path of `reference/documentation-impact.md` so fresh reviewers do not flag the citation as missing. (#44)
 
+## v5.18.0 - 2026-09-23
+
+- Projects can declare end-to-end happy-path commands in a `## Happy path` overrides table (`Row | Paths | Command | Timeout`, contract in `README.md`); `writing-plans` selects the row covering the plan's files into an optional `**Happy path:**` header line (`plan_check` validates it and bans the command from tasks and wave prose), `subagent-driven-development` runs it once in the verify phase between code review and the conformance audit under `timeout -k 30s` via `bash -c`, and the `conformance-reviewer` reads the bounded transcript as runtime evidence (`passed` / `failed` / `not run`; a failure in code the change never touched is `rescope`, never `fix`). Fix rounds re-run it only when the round touches the row's paths or an open gap cites the transcript; the closure sentinel and the finish render carry a `happy-path:` line. Optional end to end - no section, no change.
+
+## v5.17.1 - 2026-09-22
+
+- Fix finishing's verification-skip check to inspect the working tree, index, and untracked files outside the configured telemetry directory, rather than comparing commits alone. Require a known clean verified commit; uncertainty or a failed Git check reruns verification. Add executable Git regression tests to CI.
+
+## v5.17.0 - 2026-09-22
+
+- `finishing-a-development-branch` runs the plan header's `**Verification:**` set once at ship: Step 1 skips when that set passed in this session's verify phase and `git -C "$WORKTREE" diff --quiet <verified commit> HEAD -- . ':!<telemetry.dir>'` is clean, so the gated flow verifies once before a PR and twice before a squash (the post-squash run stays). The landing menu is renumbered - 1 Push + PR, 2 Push + draft PR (`gh pr create --draft`), 3 Squash-merge, 4 Keep, 5 Discard (detached HEAD: PR, draft PR, Keep, Discard); overrides files that pin finishing option numbers need updating. `writing-plans` defines the header set for multi-service repos as the affected services' commands. `scripts/ci.mjs` pins the three landing headings.
+
+## v5.16.3 - 2026-09-22
+
+- The amendment human batch card carries what the reviewer funnel already knows: the header names the step that raised the batch and the plan consequence of applying as recommended (`from <trigger>; applying as recommended reopens <ids>; <phase consequence>`), each item quotes the reviewer's verdict verbatim on a `Reviewer:` line (`not reviewed - <rule>` for prefiltered items, `reviewer unavailable: <reason>` on a failed dispatch), and `Impact:` states the approved-contract shift per spec section instead of listing plan tasks. The finish-gate disposition bullet mirrors `Reviewer:` and `Impact:`. Supersedes the card fields of `doc/specs/2026-09-19-readable-amendment-gates.md`.
+
+## v5.16.2 - 2026-09-22
+
+- gatekeep-pr: `SKILL.md` is a flow-ordered body under 250 lines; the assessment phases, finding IDs and dispositions, consent table and courses, and the post-selection loop move to `skills/gatekeep-pr/reference/{assessment,findings,decision-menu,post-selection-loop}.md`, each rule owned once. The CI telemetry-salvage probe reads `reference/post-selection-loop.md`. (#43)
+
 ## v5.16.1 - 2026-09-20
 
 - gauntlet-handoff follows the shipped pi-cohort 7.1.0 `handoff` skill: a skill cannot expand `/skill:handoff`, so step 2 reads cohort's `skills/handoff/SKILL.md` from the session skill list and follows its procedure; the brief path comes from cohort's `Handoff written:` report line (`Handoff not written:` is a STOP) instead of being recomputed; the minimum is stated as pi-cohort >= 7.1.0 in README and the brief contract. (#40)

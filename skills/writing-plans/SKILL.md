@@ -59,7 +59,7 @@ subagent({ agent: "scout", context: "fresh", async: false, cwd: "<abs worktree p
   task: <the fixed template below, with the spec path filled> })
 ```
 
-> Recon for implementation planning. Read the approved spec at `<abs spec path>` - it is the single source of truth for what is being built. Also read the repo's `AGENTS.md` and, if present, the gauntlet overrides file (checked in order: `.pi/gauntlet-overrides.md`, `gauntlet-overrides.md`, `doc/gauntlet-overrides.md` at the repo root) for conventions. Build an implementation map for the spec: exact file paths to create/modify/delete; existing call sites and tests with line ranges; conventions and patterns the plan must match; the project's test runner and the exact scoped-invocation form for running individual test files (derived from the repo's Makefile/bin/config and the overrides file); the style/lint and auto-format commands in both scoped per-file form and repo-wide form (same sources); separately, the full-suite verification entrypoint and whether it bundles style/format checks. Flag any spec claim that contradicts the code. Read-only recon: do not edit any file except writing your report to your output path. Start your report with the line `# CONTEXT DRAFT - NOT A PLAN - fully replaced at plan-writing` verbatim. End with an "Open questions that matter for the plan" section. Compact handoff, not a dump.
+> Recon for implementation planning. Read the approved spec at `<abs spec path>` - it is the single source of truth for what is being built. Also read the repo's `AGENTS.md` and, if present, the gauntlet overrides file (checked in order: `.pi/gauntlet-overrides.md`, `gauntlet-overrides.md`, `doc/gauntlet-overrides.md` at the repo root) for conventions. Build an implementation map for the spec: exact file paths to create/modify/delete; existing call sites and tests with line ranges; conventions and patterns the plan must match; the project's test runner and the exact scoped-invocation form for running individual test files (derived from the repo's Makefile/bin/config and the overrides file); the style/lint and auto-format commands in both scoped per-file form and repo-wide form (same sources); separately, the full-suite verification entrypoint and whether it bundles style/format checks. When the overrides file has a `## Happy path` section, copy its table verbatim into your report under a `## Happy path` heading. Flag any spec claim that contradicts the code. Read-only recon: do not edit any file except writing your report to your output path. Start your report with the line `# CONTEXT DRAFT - NOT A PLAN - fully replaced at plan-writing` verbatim. End with an "Open questions that matter for the plan" section. Compact handoff, not a dump.
 
 Consumption:
 
@@ -74,6 +74,8 @@ Consumption:
 **Before drafting tasks, map the files.**
 
 List the files this implementation will create, modify, or delete. Group by component. This forces the design decisions out of the task list and into a single review surface.
+
+**Happy-path row selection.** When the recon report carries a `## Happy path` table, match the union of every task's `Files:` paths against the table's `Paths` prefixes (a path is inside a row when it starts with one of the row's prefixes). Two or more non-`cross-cutting` rows matched, or a path inside the `cross-cutting` row's own `Paths` and inside no other row's -> the `cross-cutting` row (no such row -> no line); this takes precedence. Otherwise exactly one non-`cross-cutting` row matched -> that row. No row matched, or no table -> no line. The selected row becomes the header's `**Happy path:**` line (below); the parent re-derives the row from the real diff at verify time, so this is the plan-time default and the `plan_check` anchor.
 
 ```markdown
 ## Files
@@ -154,14 +156,15 @@ Each step is **one action, 2-5 minutes**:
 
 **Spec:** `<project>/doc/specs/<same-filename-as-this-plan>.md`
 
-**Verification:** `<full verification command set — tests + style + format; a single bundling entrypoint, or the listed individual commands; from the recon report / project overrides>`
+**Verification:** `<full verification command set — tests + style + format; a single bundling entrypoint, or the listed individual commands; from the recon report / project overrides>` - in a repo with per-service verification commands, list the command of every service the change affects (its own files or code it depends on; a repo-wide shared path such as root config, a lockfile, or a shared library affects every dependent service), taking the per-service commands from the overrides file or AGENTS.md when recon reports a single entrypoint
+**Happy path:** <row label> - `<command from the selected row>` (~<Timeout from the row>)
 
 **Ticket:** `<ticket-id>` (omit if none)
 
 ---
 ```
 
-The full verification entrypoint appears only on the `**Verification:**` line — see [reference/plan-contract.md § Header-only entrypoint](reference/plan-contract.md). The verify phase reads it from the plan; execution runs `Tests:` commands only. Execution runs it in the worktree via the subshell form `(cd "<abs worktree path>" && <command>)`; the process cwd stays in the primary checkout, and dispatch `cwd` is the worktree path.
+The full verification entrypoint appears only on the `**Verification:**` line — see [reference/plan-contract.md § Header-only entrypoint](reference/plan-contract.md). The verify phase reads it from the plan; execution runs `Tests:` commands only. Execution runs it in the worktree via the subshell form `(cd "<abs worktree path>" && <command>)`; the process cwd stays in the primary checkout, and dispatch `cwd` is the worktree path. The `**Happy path:**` line is optional: present only when File Structure selected a row, with the row label, the row's command in backticks, and the row's `Timeout` as `(~<duration>)` (omit the suffix when the cell is absent or malformed). Like `Verification`, the happy-path command appears only on this header line - never in a task's `Tests:` or `Run:` block and never as free text in wave scope; `plan_check` enforces both.
 
 ## Task Structure
 
@@ -233,6 +236,7 @@ Every plan ends with a `## Spec coverage` section (grammar and example: [referen
 
 - **Requirement rows:** a cross-cutting requirement (decided in more than one task) lists **every** deciding task as owner, not the first. `waived: <reason>` is only for requirements the spec marks out of scope **and** that exclude work from the change. A requirement whose text carries an inline code span (`` `literal` ``) names concrete behaviour and is never waivable - it maps to a task or `Verification`. A waiver on an in-scope normative requirement is a Self-Review failure — there is no human plan-review gate to catch it downstream.
 - **`Verification` owner:** only for a requirement the header command proves; grammar in the reference.
+- `Happy path` is never an owner. Coverage by the happy-path run is inferred by the conformance reviewer at audit time, never declared in the plan; the checker rejects the cell under the owner-grammar reason.
 - The table is plan-authoring-time only — never passed to implementer or reviewer dispatches.
 
 ## No Placeholders

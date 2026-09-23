@@ -424,6 +424,63 @@ test("header-entrypoint: Tests: bullets are judged by tests-block, not here", ()
   assert.ok(findingsFor(checkPlan(mutated, SPEC_TEXT, alwaysTruePort()), "tests-block").some((f) => f.reason.includes("full-suite command")));
 });
 
+const withHappyPath = (plan: string, line: string) =>
+  plan.replace("**Verification:** npm run fixture-verify", `**Verification:** npm run fixture-verify\n\n${line}`);
+const HP = (plan: string) => findingsFor(checkPlan(plan, SPEC_TEXT, alwaysTruePort()), "header-happy-path");
+
+test("header-happy-path: line with label, backticked command, and (~5m) duration is accepted", () => {
+  const plan = withHappyPath(VALID_PLAN, "**Happy path:** stack - `script/e2e-stack` (~5m)");
+  assert.deepEqual(checkPlan(plan, SPEC_TEXT, alwaysTruePort()), []);
+});
+
+test("header-happy-path: line without a duration is accepted", () => {
+  const plan = withHappyPath(VALID_PLAN, "**Happy path:** stack - `script/e2e-stack`");
+  assert.deepEqual(checkPlan(plan, SPEC_TEXT, alwaysTruePort()), []);
+});
+
+test("header-happy-path: line without label, backticks, or a valid duration is malformed", () => {
+  for (const line of [
+    "**Happy path:** script/e2e-stack",
+    "**Happy path:** stack - script/e2e-stack",
+    "**Happy path:** `script/e2e-stack` (~5m)",
+    "**Happy path:** stack - `script/e2e-stack` (~5d)",
+    "**Happy path:** stack - `script/e2e-stack` (5m)",
+  ]) {
+    const findings = HP(withHappyPath(VALID_PLAN, line));
+    assert.equal(findings.length, 1, line);
+    assert.ok(findings[0].reason.includes("malformed **Happy path:** line"), line);
+  }
+});
+
+test("header-happy-path: line after the --- separator is ignored", () => {
+  const plan = VALID_PLAN.replace("\n---\n", "\n---\n\n**Happy path:** stack - `script/e2e-stack`\n");
+  assert.deepEqual(HP(plan), []);
+});
+
+test("tests-block: Tests: bullet equal to the happy-path command is a full-suite command", () => {
+  const plan = withHappyPath(VALID_PLAN, "**Happy path:** stack - `script/e2e-stack` (~5m)").replace(
+    "**Tests:**\n- `node --test extensions/lib/fixture-task2.test.ts`",
+    "**Tests:**\n- `script/e2e-stack`",
+  );
+  const tb = findingsFor(checkPlan(plan, SPEC_TEXT, alwaysTruePort()), "tests-block");
+  assert.ok(tb.some((f) => f.reason.includes("full-suite command")), JSON.stringify(tb));
+});
+
+test("header-entrypoint: Run: payload and free text repeating the happy-path command fail", () => {
+  const base = withHappyPath(VALID_PLAN, "**Happy path:** stack - `script/e2e-stack` (~5m)");
+  const run = base.replace("This task handles naming details.", "Run: `script/e2e-stack`");
+  assert.ok(HE(run).some((f) => f.text.includes("Run: `script/e2e-stack`")));
+  const prose = base.replace("This task handles naming details.", "Then run script/e2e-stack to confirm.");
+  assert.ok(HE(prose).some((f) => f.text.includes("script/e2e-stack")));
+});
+
+test("table-closure: owner cell 'Happy path' is malformed under the existing reason", () => {
+  const row = '| § "Acceptance" L16 | full suite passes | Happy path |';
+  const plan = withHappyPath(withRow(VALID_PLAN, row), "**Happy path:** stack - `script/e2e-stack` (~5m)");
+  const tc = findingsFor(checkPlan(plan, SPEC_TEXT, alwaysTruePort()), "table-closure");
+  assert.ok(tc.some((f) => f.reason === "owner cell is not a 'Task <n>' list, 'Verification', or 'waived: <reason>'" && f.text === row));
+});
+
 test("wave-file-disjointness: Test/Test allowed; Test vs Modify conflict; Modify/Modify conflict", () => {
   const shared = "- Test: extensions/lib/fixture-shared.test.ts\n";
   const testTest = VALID_PLAN.replace("- Test: extensions/lib/fixture-task1.test.ts\n", shared).replace("- Test: extensions/lib/fixture-task2.test.ts\n", shared)

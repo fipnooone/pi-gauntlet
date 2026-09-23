@@ -55,7 +55,7 @@ invent ACs.
 
 `mergeable` is reported as-is, including `UNKNOWN` - the Gatherer runs before
 provisioning, so it never re-polls; the orchestrator re-polls once after
-provisioning the worktree (see SKILL.md Phase 2) and treats a still-`UNKNOWN`
+provisioning the worktree (per `reference/assessment.md` `## Phase 2 - Provision worktree`) and treats a still-`UNKNOWN`
 result as not merge-ready. Bot author noted
 (`author_is_bot`). Capture each status check's `isRequired` where exposed (digest field: `required`).
 
@@ -81,7 +81,7 @@ conclusion, with `ERROR` blocking and `PENDING` pending. Missing `required` is
 treated as non-required. `ci checks:` matches check name, workflow name, or
 status context, trimmed, case-insensitive. What checks mean for verification evidence is owned by
 Section B's Evidence resolution table; what they mean for merge is owned by the
-orchestrator's required-check rule (SKILL.md Phase 4) - two independent
+orchestrator's required-check rule (`reference/findings.md` `## Dispositions`) - two independent
 consumers of the same data.
 
 ## Section B - Verifier

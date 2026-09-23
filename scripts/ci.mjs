@@ -227,6 +227,10 @@ const tokenChecks = [
   ["skills/brainstorming/reference/amendment-surface.md", "Mode: amendment-review", true],
   ["skills/brainstorming/reference/amendment-surface.md", "auto-apply", true],
   ["skills/brainstorming/reference/amendment-surface.md", "escalate", true],
+  ["skills/brainstorming/reference/amendment-surface.md", "Reviewer:", true],
+  ["skills/brainstorming/reference/amendment-surface.md", "applying as recommended", true],
+  ["skills/brainstorming/reference/amendment-surface.md", "or: no plan yet", false],
+  ["skills/finishing-a-development-branch/reference/disposition-protocol.md", "Reviewer:", true],
   ["agents/spec-council-member.md", "Mode: amendment-review", true],
   ["skills/finishing-a-development-branch/SKILL.md", "Amendments auto-applied", true],
   // #41 ticket ACs carried verbatim into the spec
@@ -290,14 +294,14 @@ if (!existsSync(R("skills/gauntlet-performance/../../bin/gauntlet-performance.mj
   if (!worktreeFirst.includes("telemetry record")) fail("skills/brainstorming/SKILL.md: Worktree First must name the telemetry record as a deliverable");
   const finishing = txt("skills/finishing-a-development-branch/SKILL.md");
   if (!finishing.includes("gauntlet-telemetry-salvage.mjs")) fail("skills/finishing-a-development-branch/SKILL.md: missing the gauntlet-telemetry-salvage.mjs call");
-  for (const opt of ["#### Option 1: Squash-merge to base", "#### Option 2: Push and Create PR"]) {
+  for (const opt of ["#### Option 1: Push and Create PR", "#### Option 2: Push and Create Draft PR", "#### Option 3: Squash-merge to base"]) {
     const block = finishing.split(opt)[1]?.split(/^#### /m)[0] ?? "";
     if (!block.includes("telemetry record")) fail(`skills/finishing-a-development-branch/SKILL.md: "${opt}" must name the telemetry record`);
   }
-  const gate = txt("skills/gatekeep-pr/SKILL.md");
+  const gate = txt("skills/gatekeep-pr/reference/post-selection-loop.md");
   const postSelection = gate.split(/^## Post-selection loop/m)[1]?.split(/^## /m)[0] ?? "";
-  if (!postSelection.includes("gauntlet-telemetry-salvage.mjs")) fail("skills/gatekeep-pr/SKILL.md: Post-selection loop must call gauntlet-telemetry-salvage.mjs");
-  if (!/never delete[^\n]*telemetry/.test(postSelection)) fail("skills/gatekeep-pr/SKILL.md: Post-selection loop must forbid deleting the telemetry record");
+  if (!postSelection.includes("gauntlet-telemetry-salvage.mjs")) fail("skills/gatekeep-pr/reference/post-selection-loop.md: Post-selection loop must call gauntlet-telemetry-salvage.mjs");
+  if (!/never delete[^\n]*telemetry/.test(postSelection)) fail("skills/gatekeep-pr/reference/post-selection-loop.md: Post-selection loop must forbid deleting the telemetry record");
 }
 // touched-files + over-spec in the same paragraph of conformance-check.md
 const ccParas = txt("skills/verification-before-completion/reference/conformance-check.md").split(/\n\s*\n/);
@@ -401,6 +405,13 @@ try {
 }
 
 // ---- executable skill examples --------------------------------------------
+try {
+  execFileSync(process.execPath, ["--test", R("scripts/finish-verification.test.mjs")], { stdio: "pipe" });
+  ok("finish verification skip checks pass real Git fixtures");
+} catch (e) {
+  fail(`finish verification skip checks failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 30).join("\n    ")}`);
+}
+
 try {
   execFileSync(process.execPath, [R("scripts/linear-download-doc.test.mjs")], { stdio: "pipe" });
   ok("Linear download recovery example passes offline fixture test");

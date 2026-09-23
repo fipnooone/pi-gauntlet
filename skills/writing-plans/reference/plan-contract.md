@@ -27,7 +27,7 @@ Every `### Task N` carries a `**Tests:**` block: the bare line `**Tests:**` dire
 
 Absence is never valid. A `- [ ]` step or any non-bullet line ends the block. `via:` and `none:` are unchecked beyond form.
 
-Commands are written repo-relative and run in the worktree via `(cd "<abs worktree path>" && <command>)` - the checker never runs them; the executor does. Each command is split into segments on `&&`, `||`, `;`, `|`; every segment must contain, as a whitespace-delimited token, a `Test:` path of the same task (the path alone, or followed by `::`, `#`, or `:` and a filter). A `Test:` value containing `*`, `?`, `[` or ending in `/` never anchors; any other argument token with those shapes is a broadening selector and fails. `cd `, `sh -c`, `bash -c`, `eval `, `$(` are unsupported. Each `Test:` path must exist or be a `Create:` path of some task. A segment equal to a header `**Verification:**` segment is a full-suite command and fails. Runners with no file-addressable form are out of scope (`go test ./pkg -run X`, `mvn -Dtest=`).
+Commands are written repo-relative and run in the worktree via `(cd "<abs worktree path>" && <command>)` - the checker never runs them; the executor does. Each command is split into segments on `&&`, `||`, `;`, `|`; every segment must contain, as a whitespace-delimited token, a `Test:` path of the same task (the path alone, or followed by `::`, `#`, or `:` and a filter). A `Test:` value containing `*`, `?`, `[` or ending in `/` never anchors; any other argument token with those shapes is a broadening selector and fails. `cd `, `sh -c`, `bash -c`, `eval `, `$(` are unsupported. Each `Test:` path must exist or be a `Create:` path of some task. A segment equal to a header `**Verification:**` or `**Happy path:**` segment is a full-suite command and fails. Runners with no file-addressable form are out of scope (`go test ./pkg -run X`, `mvn -Dtest=`).
 
 ## Solo line (`solo-line`)
 
@@ -38,6 +38,12 @@ A wave with one task carries, directly under its `## Wave N — <label>` header,
 The `**Verification:**` line is the **only** place the full verification entrypoint may appear — never in any task or wave step. The verify phase reads it from the plan instead of re-deriving it; execution runs scoped commands only.
 
 The header value's backtick spans (else the raw value) are split on `&&`, `||`, `;`, `,` into segments. No `Run:` step payload segment and no `Tests:` bullet segment may equal a header segment; prose inside waves may not contain the whole header value.
+
+The optional `**Happy path:**` line's backticked command is a second header entrypoint under the same rule: its segments join the header segment set, and its whole command may not appear in wave prose.
+
+## Happy path line (`header-happy-path`)
+
+Optional. When present, the header line reads `**Happy path:** <label> - \`<command>\`` with an optional ` (~<duration>)` suffix, `<duration>` matching `\d+(s|m|h)`. A present line that does not parse is a finding; absence is never a finding. The label names the row of the overrides file's `## Happy path` table the plan selected; the verify phase reads the line from the plan and re-derives the row from the real diff.
 
 ## Spec coverage table (`table-closure`, `waiver-literal`)
 
