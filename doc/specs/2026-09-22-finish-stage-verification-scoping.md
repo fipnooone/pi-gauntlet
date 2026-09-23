@@ -1,5 +1,7 @@
 # Finish-stage verification scoping
 
+> **Superseded by:** [doc/specs/2026-09-22-finish-verification-dirty-tree-hotfix.md](./2026-09-22-finish-verification-dirty-tree-hotfix.md) - Step 1 skip predicate and its test coverage only
+
 **Goal:** Run the full verification set once before a PR opens and twice before a squash lands (the post-squash run is kept deliberately) instead of two and three times, make PR the first landing option with a draft-PR sibling, and define the plan header's `**Verification:**` set as the affected services' commands in multi-service repos - all as prose edits plus two CI literals.
 
 **Supersedes:** [doc/specs/2026-08-12-execution-fidelity-hardening.md](./2026-08-12-execution-fidelity-hardening.md), the "ship-time re-run accepted, out of scope" note only (its Out of scope bullet on `finishing-a-development-branch` and the closing sentence of the tier-boundary paragraph). The once-at-verify tiering rule itself stands.

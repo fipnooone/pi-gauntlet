@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix finishing's verification-skip check to inspect the working tree, index, and untracked files outside the configured telemetry directory, rather than comparing commits alone. Require a known clean verified commit; uncertainty or a failed Git check reruns verification. Add executable Git regression tests to CI.
+
 ## v5.17.0 - 2026-09-22
 
 - `finishing-a-development-branch` runs the plan header's `**Verification:**` set once at ship: Step 1 skips when that set passed in this session's verify phase and `git -C "$WORKTREE" diff --quiet <verified commit> HEAD -- . ':!<telemetry.dir>'` is clean, so the gated flow verifies once before a PR and twice before a squash (the post-squash run stays). The landing menu is renumbered - 1 Push + PR, 2 Push + draft PR (`gh pr create --draft`), 3 Squash-merge, 4 Keep, 5 Discard (detached HEAD: PR, draft PR, Keep, Discard); overrides files that pin finishing option numbers need updating. `writing-plans` defines the header set for multi-service repos as the affected services' commands. `scripts/ci.mjs` pins the three landing headings.

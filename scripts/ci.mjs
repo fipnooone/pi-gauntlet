@@ -406,6 +406,13 @@ try {
 
 // ---- executable skill examples --------------------------------------------
 try {
+  execFileSync(process.execPath, ["--test", R("scripts/finish-verification.test.mjs")], { stdio: "pipe" });
+  ok("finish verification skip checks pass real Git fixtures");
+} catch (e) {
+  fail(`finish verification skip checks failed:\n    ${String(e.stdout || e.stderr || e).split("\n").slice(0, 30).join("\n    ")}`);
+}
+
+try {
   execFileSync(process.execPath, [R("scripts/linear-download-doc.test.mjs")], { stdio: "pipe" });
   ok("Linear download recovery example passes offline fixture test");
 } catch (e) {

@@ -36,7 +36,7 @@ Then call `phase_tracker({ action: "start", phase: "ship" })`.
 
 Run the plan header's `**Verification:**` set in the worktree: `(cd "$WORKTREE" && <command>)`. With no plan in this session, run the verification command(s) of the affected services from the gauntlet overrides file or `AGENTS.md` (look for "verification", "CI", or "test" sections).
 
-**Skip rule.** Skip the run when this set passed in the verify phase of this session and the tree is unchanged since apart from the telemetry record: `git -C "$WORKTREE" diff --quiet <commit the run passed on> HEAD -- . ':!<telemetry.dir>'` (`<telemetry.dir>` defaults to `.pi/gauntlet/telemetry`) exits 0 and no edit or write landed outside `<telemetry.dir>` since. Otherwise run it once. Unsure means run.
+**Skip rule.** Skip the run only when this set passed on a known clean commit in the verify phase of this session and no edit or write landed outside `<telemetry.dir>` since. Check the current tree: `git -C "$WORKTREE" diff --quiet <commit the run passed on> -- . ':!<telemetry.dir>'` must exit 0, and `git -C "$WORKTREE" status --porcelain --untracked-files=all -- . ':!<telemetry.dir>'` must exit 0 with empty output (`<telemetry.dir>` defaults to `.pi/gauntlet/telemetry`). These checks cover committed, staged, unstaged, and untracked changes outside telemetry. Otherwise run it once; a missing verified commit, a failed check, or uncertainty means run.
 
 **Scoping caveat — pre-existing findings.** Some services carry lint findings unrelated to the diff. If verification fails on lines you didn't touch:
 
