@@ -34,7 +34,7 @@ Everything else - evidence-backed factual drift outside human-owned text - goes 
 
 ## 3. Reviewer - one dispatch per batch
 
-Resolve `reference/documentation-impact.md` relative to the loaded brainstorming SKILL directory as one absolute `<DOCUMENTATION_IMPACT_GUIDELINE>` path value before this dispatch. Pass that value in the task; do not add it to the spec.
+Resolve the sibling `documentation-impact.md` in this file's directory as one absolute `<DOCUMENTATION_IMPACT_GUIDELINE>` path value before this dispatch. Pass that value in the task; do not add it to the spec.
 
 Rubric - `auto-apply` only when all three hold:
 

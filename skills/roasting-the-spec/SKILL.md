@@ -68,7 +68,7 @@ subagent({
     cwd: "<abs worktree path>",
     task: "Problem statement: <the problem the spec addresses, from its Context section and the user's stated intent>.\n" +
           "Human input (verbatim; off-limits for over-spec):\n```\n<original prompt>\n<ticket AC snapshot, if any>\n<questionary answers that changed scope>\n```\n" +
-          "Read the spec at <abs path to doc/specs/...>. The portable citation `reference/documentation-impact.md` in the spec is the pi-gauntlet guideline at <DOCUMENTATION_IMPACT_GUIDELINE>, not a consumer doc; do not flag it as an external reference. Verify its load-bearing claims against the codebase, bounded per your verification-hygiene rules (rg, explicit paths, timeout 30). Critique it on your five axes and emit your template.",
+          "Read the spec at <abs path to doc/specs/...>. The portable citation `reference/documentation-impact.md` in the spec is the pi-gauntlet guideline at <DOCUMENTATION_IMPACT_GUIDELINE>, not a consumer doc; do not flag it as an external reference. Verify the spec's load-bearing claims against the codebase, bounded per your verification-hygiene rules (rg, explicit paths, timeout 30). Critique it on your five axes and emit your template.",
     output: "<tmpdir>/member-" + i + "-" + slug(model) + ".md"
   }))
 })

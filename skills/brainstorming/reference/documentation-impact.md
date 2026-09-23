@@ -120,7 +120,7 @@ later event and should not be flagged as missing before that event fires).
 
 Keep this list in sync with the skills that cite this doc:
 
-- `brainstorming` section 6, its Spec Self-Review check, and its council/worker dispatch context.
+- `brainstorming` section 6, its Spec Self-Review check, and its worker dispatch context.
 - `roasting-the-spec` member and chair dispatch context.
 - `brainstorming/reference/amendment-surface.md` amendment-review dispatch context.
 - `writing-plans` - sources doc-update tasks from the spec's Documentation
