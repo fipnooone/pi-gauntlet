@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fixed independent spec reviewers' access to the author documentation guideline while keeping citations portable and preventing guideline details from leaking into specs. (#44)
+- Review dispatch tasks now carry the installed path of `reference/documentation-impact.md` so fresh reviewers do not flag the citation as missing. (#44)
 
 ## v5.16.1 - 2026-09-20
 
